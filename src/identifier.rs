@@ -6,16 +6,16 @@ use fstr::FStr;
 
 use crate::NODE_CTR_SIZE;
 
-/// Maximum valid value of the `timestamp` field.
-const TIMESTAMP_MAX: u64 = Scru64Id::MAX.to_u64() >> NODE_CTR_SIZE;
+/// The maximum valid value of the `timestamp` field.
+const MAX_TIMESTAMP: u64 = Scru64Id::MAX.to_u64() >> NODE_CTR_SIZE;
 
-/// Maximum valid value of the combined `node_ctr` field.
-const NODE_CTR_MAX: u32 = (1 << NODE_CTR_SIZE) - 1;
+/// The maximum valid value of the combined `node_ctr` field.
+const MAX_NODE_CTR: u32 = (1 << NODE_CTR_SIZE) - 1;
 
 /// Digit characters used in the Base36 notation.
 const DIGITS: [u8; 36] = *b"0123456789abcdefghijklmnopqrstuvwxyz";
 
-/// O(1) map from ASCII code points to Base36 digit values.
+/// An O(1) map from ASCII code points to Base36 digit values.
 const DECODE_MAP: [u8; 256] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -41,10 +41,10 @@ const DECODE_MAP: [u8; 256] = [
 pub struct Scru64Id(u64);
 
 impl Scru64Id {
-    /// Minimum valid value (i.e., `000000000000`).
+    /// The minimum valid value (i.e., `000000000000`).
     pub const MIN: Self = Scru64Id(0u64);
 
-    /// Maximum valid value (i.e., `zzzzzzzzzzzz`).
+    /// The maximum valid value (i.e., `zzzzzzzzzzzz`).
     pub const MAX: Self = Scru64Id(36u64.pow(12) - 1);
 
     /// Returns the integer representation.
@@ -149,7 +149,7 @@ impl Scru64Id {
 
     /// Returns the `node_id` and `counter` field values combined as a single integer.
     pub const fn node_ctr(self) -> u32 {
-        self.0 as u32 & NODE_CTR_MAX
+        self.0 as u32 & MAX_NODE_CTR
     }
 
     /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
@@ -158,8 +158,8 @@ impl Scru64Id {
     ///
     /// Panics if any argument is out of the valid value range.
     pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
-        assert!(timestamp <= TIMESTAMP_MAX, "`timestamp` out of range");
-        assert!(node_ctr <= NODE_CTR_MAX, "`node_ctr` out of range");
+        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
+        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
         Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
     }
 }
@@ -207,7 +207,7 @@ impl str::FromStr for Scru64Id {
     }
 }
 
-/// Error converting a value into SCRU64 ID.
+/// An error converting a value into SCRU64 ID.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ConversionError {

@@ -143,7 +143,7 @@ impl Scru64Generator {
                 self.prev = Scru64Id::from_parts(prev_timestamp + 1, self.init_node_ctr());
             }
         } else {
-            // abort if clock moves back to unbearable extent
+            // abort if clock went backwards to unbearable extent
             return None;
         }
         Some(self.prev)
@@ -193,7 +193,7 @@ const fn verify_node(node_id: u32, node_id_size: u8) -> Result<(), NodeSpecError
     Ok(())
 }
 
-/// Error parsing a node spec string.
+/// An error parsing a node spec string.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum NodeSpecError {
