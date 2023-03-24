@@ -104,11 +104,14 @@ impl Scru64Generator {
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
+    /// The `rollback_allowance` parameter specifies the amount of `unix_ts_ms` rollback that is
+    /// considered significant. A suggested value is `10_000` (milliseconds).
+    ///
     /// # Panics
     ///
     /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
-    pub fn generate_or_reset_core(&mut self, unix_ts_ms: u64) -> Scru64Id {
-        if let Some(value) = self.generate_or_abort_core(unix_ts_ms) {
+    pub fn generate_or_reset_core(&mut self, unix_ts_ms: u64, rollback_allowance: u64) -> Scru64Id {
+        if let Some(value) = self.generate_or_abort_core(unix_ts_ms, rollback_allowance) {
             value
         } else {
             // reset state and resume
@@ -122,19 +125,29 @@ impl Scru64Generator {
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
+    /// The `rollback_allowance` parameter specifies the amount of `unix_ts_ms` rollback that is
+    /// considered significant. A suggested value is `10_000` (milliseconds).
+    ///
     /// # Panics
     ///
     /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
-    pub fn generate_or_abort_core(&mut self, unix_ts_ms: u64) -> Option<Scru64Id> {
-        const ROLLBACK_ALLOWANCE: u64 = 40; // x256 milliseconds = ~10 seconds
-
+    pub fn generate_or_abort_core(
+        &mut self,
+        unix_ts_ms: u64,
+        rollback_allowance: u64,
+    ) -> Option<Scru64Id> {
         let timestamp = unix_ts_ms >> 8;
+        let allowance = rollback_allowance >> 8;
         assert!(timestamp > 0, "`timestamp` out of range");
+        assert!(
+            allowance < (1 << 40),
+            "`rollback_allowance` out of reasonable range"
+        );
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
             self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr());
-        } else if timestamp + ROLLBACK_ALLOWANCE > prev_timestamp {
+        } else if timestamp + allowance > prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
             let counter_mask = (1u32 << self.counter_size) - 1;
@@ -172,7 +185,7 @@ mod std_ext {
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
         pub fn generate(&mut self) -> Option<Scru64Id> {
-            self.generate_or_abort_core(unix_ts_ms())
+            self.generate_or_abort_core(unix_ts_ms(), 10_000)
         }
 
         /// Generates a new SCRU64 ID object from the current `timestamp`, or resets the generator
@@ -180,7 +193,7 @@ mod std_ext {
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
         pub fn generate_or_reset(&mut self) -> Scru64Id {
-            self.generate_or_reset_core(unix_ts_ms())
+            self.generate_or_reset_core(unix_ts_ms(), 10_000)
         }
     }
 }
