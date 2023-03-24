@@ -83,11 +83,11 @@ mod global_gen {
         Mutex::new(g)
     });
 
-    fn generate_no_rewind() -> Option<Scru64Id> {
+    fn generate_or_abort() -> Option<Scru64Id> {
         GLOBAL_GENERATOR
             .lock()
             .unwrap_or_else(|err| panic!("scru64: could not lock global generator: {err}"))
-            .generate_no_rewind()
+            .generate()
     }
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
@@ -100,7 +100,7 @@ mod global_gen {
     /// environment variable.
     pub fn new() -> Scru64Id {
         loop {
-            if let Some(value) = generate_no_rewind() {
+            if let Some(value) = generate_or_abort() {
                 break value;
             } else {
                 thread::sleep(DELAY);
@@ -123,7 +123,7 @@ mod global_gen {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub mod async_tokio {
-        use super::{generate_no_rewind, Scru64Id, DELAY};
+        use super::{generate_or_abort, Scru64Id, DELAY};
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
@@ -133,7 +133,7 @@ mod global_gen {
         /// `SCRU64_NODE_SPEC` environment variable.
         pub async fn new() -> Scru64Id {
             loop {
-                if let Some(value) = generate_no_rewind() {
+                if let Some(value) = generate_or_abort() {
                     break value;
                 } else {
                     tokio::time::sleep(DELAY).await;
@@ -150,7 +150,7 @@ mod global_gen {
         /// `SCRU64_NODE_SPEC` environment variable.
         pub async fn new_string() -> String {
             loop {
-                if let Some(value) = generate_no_rewind() {
+                if let Some(value) = generate_or_abort() {
                     break value.into();
                 } else {
                     tokio::time::sleep(DELAY).await;

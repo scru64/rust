@@ -12,23 +12,24 @@ use crate::{Scru64Id, NODE_CTR_SIZE};
 ///
 /// The generator offers four different methods to generate a SCRU64 ID:
 ///
-/// | Flavor                      | Timestamp | On big clock rewind |
-/// | --------------------------- | --------- | ------------------- |
-/// | [`generate`]                | Now       | Rewinds state       |
-/// | [`generate_no_rewind`]      | Now       | Returns `None`      |
-/// | [`generate_core`]           | Argument  | Rewinds state       |
-/// | [`generate_core_no_rewind`] | Argument  | Returns `None`      |
+/// | Flavor                     | Timestamp | On big clock rewind |
+/// | -------------------------- | --------- | ------------------- |
+/// | [`generate`]               | Now       | Returns `None`      |
+/// | [`generate_or_reset`]      | Now       | Resets generator    |
+/// | [`generate_or_abort_core`] | Argument  | Returns `None`      |
+/// | [`generate_or_reset_core`] | Argument  | Resets generator    |
 ///
-/// Each method returns monotonically increasing IDs unless a timestamp provided is significantly
-/// (by ~10 seconds or more) smaller than the one embedded in the immediately preceding ID. If such
-/// a significant clock rollback is detected, the standard `generate` rewinds the generator state
-/// and returns a new ID based on the current timestamp, whereas `no_rewind` variants keep the
-/// state untouched and return `None`. `core` functions offer low-level primitives.
+/// All of these methods return monotonically increasing IDs unless a timestamp provided is
+/// significantly (by default, approx. 10 seconds or more) smaller than the one embedded in the
+/// immediately preceding ID. If such a significant clock rollback is detected, the `generate`
+/// (or_abort) method aborts and returns `None`, while the `or_reset` variants reset the generator
+/// and return a new ID based on the given timestamp. The `core` functions offer low-level
+/// primitives.
 ///
 /// [`generate`]: Scru64Generator::generate
-/// [`generate_no_rewind`]: Scru64Generator::generate_no_rewind
-/// [`generate_core`]: Scru64Generator::generate_core
-/// [`generate_core_no_rewind`]: Scru64Generator::generate_core_no_rewind
+/// [`generate_or_reset`]: Scru64Generator::generate_or_reset
+/// [`generate_or_abort_core`]: Scru64Generator::generate_or_abort_core
+/// [`generate_or_reset_core`]: Scru64Generator::generate_or_reset_core
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Scru64Generator {
     prev: Scru64Id,
@@ -98,15 +99,16 @@ impl Scru64Generator {
         (self.node_id() << self.counter_size) | counter
     }
 
-    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds.
+    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, or resets the
+    /// generator upon significant timestamp rollback.
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
     /// # Panics
     ///
-    /// Panics if the argument is not a positive integer within the valid range.
-    pub fn generate_core(&mut self, unix_ts_ms: u64) -> Scru64Id {
-        if let Some(value) = self.generate_core_no_rewind(unix_ts_ms) {
+    /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
+    pub fn generate_or_reset_core(&mut self, unix_ts_ms: u64) -> Scru64Id {
+        if let Some(value) = self.generate_or_abort_core(unix_ts_ms) {
             value
         } else {
             // reset state and resume
@@ -115,15 +117,15 @@ impl Scru64Generator {
         }
     }
 
-    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, guaranteeing the
-    /// monotonic order of generated IDs despite a significant timestamp rollback.
+    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, or returns `None`
+    /// upon significant timestamp rollback.
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
     /// # Panics
     ///
-    /// Panics if the argument is not a positive integer within the valid range.
-    pub fn generate_core_no_rewind(&mut self, unix_ts_ms: u64) -> Option<Scru64Id> {
+    /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
+    pub fn generate_or_abort_core(&mut self, unix_ts_ms: u64) -> Option<Scru64Id> {
         const ROLLBACK_ALLOWANCE: u64 = 40; // x256 milliseconds = ~10 seconds
 
         let timestamp = unix_ts_ms >> 8;
@@ -165,19 +167,20 @@ mod std_ext {
     }
 
     impl Scru64Generator {
-        /// Generates a new SCRU64 ID object from the current `timestamp`.
+        /// Generates a new SCRU64 ID object from the current `timestamp`, or returns `None` upon
+        /// significant timestamp rollback.
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
-        pub fn generate(&mut self) -> Scru64Id {
-            self.generate_core(unix_ts_ms())
+        pub fn generate(&mut self) -> Option<Scru64Id> {
+            self.generate_or_abort_core(unix_ts_ms())
         }
 
-        /// Generates a new SCRU64 ID object from the current `timestamp`, guaranteeing the
-        /// monotonic order of generated IDs despite a significant timestamp rollback.
+        /// Generates a new SCRU64 ID object from the current `timestamp`, or resets the generator
+        /// upon significant timestamp rollback.
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
-        pub fn generate_no_rewind(&mut self) -> Option<Scru64Id> {
-            self.generate_core_no_rewind(unix_ts_ms())
+        pub fn generate_or_reset(&mut self) -> Scru64Id {
+            self.generate_or_reset_core(unix_ts_ms())
         }
     }
 }
