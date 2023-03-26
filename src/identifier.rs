@@ -254,6 +254,147 @@ mod std_ext {
     impl std::error::Error for ConversionError {}
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{test_cases::TEST_CASES, Scru64Id};
+
+    /// Tests equality comparison.
+    #[test]
+    fn eq() {
+        #[cfg(feature = "std")]
+        let hash = {
+            use core::hash::{BuildHasher, Hash, Hasher};
+            let s = std::collections::hash_map::RandomState::new();
+            move |value: Scru64Id| {
+                let mut hasher = s.build_hasher();
+                value.hash(&mut hasher);
+                hasher.finish()
+            }
+        };
+
+        let mut prev = Scru64Id::const_from_u64(TEST_CASES.last().unwrap().num);
+        for e in TEST_CASES {
+            let curr = Scru64Id::const_from_u64(e.num);
+            let twin = Scru64Id::const_from_u64(e.num);
+
+            assert_eq!(curr, twin);
+            assert_eq!(twin, curr);
+            assert_eq!(curr.to_u64(), twin.to_u64());
+            assert_eq!(curr.encode(), twin.encode());
+            assert_eq!(curr.timestamp(), twin.timestamp());
+            assert_eq!(curr.node_ctr(), twin.node_ctr());
+
+            assert_ne!(prev, curr);
+            assert_ne!(curr, prev);
+            assert_ne!(curr.to_u64(), prev.to_u64());
+            assert_ne!(curr.encode(), prev.encode());
+            assert!((curr.timestamp() != prev.timestamp()) || (curr.node_ctr() != prev.node_ctr()));
+
+            #[cfg(feature = "std")]
+            {
+                assert_eq!(hash(curr), hash(twin));
+                assert_ne!(hash(curr), hash(prev));
+            }
+
+            prev = curr;
+        }
+    }
+
+    /// Tests ordering comparison.
+    #[test]
+    fn ord() {
+        let mut cases = TEST_CASES.to_vec();
+        cases.sort_by_key(|e| e.num);
+
+        let mut prev = Scru64Id::const_from_u64(cases[0].num);
+        for e in cases.iter().skip(1) {
+            let curr = Scru64Id::const_from_u64(e.num);
+
+            assert!(prev < curr);
+            assert!(prev <= curr);
+
+            assert!(curr > prev);
+            assert!(curr >= prev);
+
+            prev = curr;
+        }
+    }
+
+    /// Tests conversion-to methods.
+    #[test]
+    fn convert_to() {
+        for e in TEST_CASES {
+            let x = Scru64Id::const_from_u64(e.num);
+
+            assert_eq!(x.to_u64(), e.num);
+            assert_eq!(u64::from(x), e.num);
+            assert_eq!(i64::from(x), e.num.try_into().unwrap());
+            assert_eq!(&x.encode(), e.text);
+            assert_eq!(x.timestamp(), e.timestamp);
+            assert_eq!(x.node_ctr(), e.node_ctr);
+
+            #[cfg(feature = "std")]
+            {
+                assert_eq!(x.to_string(), e.text);
+                assert_eq!(String::from(x), e.text);
+            }
+        }
+    }
+
+    /// Tests conversion-from methods.
+    #[test]
+    fn convert_from() {
+        for e in TEST_CASES {
+            let x = Scru64Id::const_from_u64(e.num);
+
+            assert_eq!(x, (e.num as u64).try_into().unwrap());
+            assert_eq!(x, (e.num as i64).try_into().unwrap());
+            assert_eq!(x, e.text.parse().unwrap());
+            assert_eq!(x, Scru64Id::from_parts(e.timestamp, e.node_ctr));
+
+            #[cfg(feature = "std")]
+            {
+                assert_eq!(x, e.text.to_owned().try_into().unwrap());
+                assert_eq!(x, e.text.to_ascii_uppercase().parse().unwrap());
+                assert_eq!(x, e.text.to_ascii_uppercase().try_into().unwrap());
+            }
+        }
+    }
+
+    /// Tests if conversion from too large or small integer fails.
+    #[test]
+    fn from_int_error() {
+        assert!(Scru64Id::try_from(36u64.pow(12)).is_err());
+        assert!(Scru64Id::try_from(u64::MAX).is_err());
+
+        assert!(Scru64Id::try_from(-1i64).is_err());
+        assert!(Scru64Id::try_from(i64::MAX).is_err());
+        assert!(Scru64Id::try_from(i64::MIN).is_err());
+    }
+
+    /// Tests if conversion from invalid string representation fails.
+    #[test]
+    fn parse_error() {
+        let cases = [
+            "",
+            " 0u3wrp5g81jx",
+            "0u3wrp5g81jy ",
+            " 0u3wrp5g81jz ",
+            "+0u3wrp5g81k0",
+            "-0u3wrp5g81k1",
+            "+u3wrp5q7ta5",
+            "-u3wrp5q7ta6",
+            "0u3w_p5q7ta7",
+            "0u3wrp5-7ta8",
+            "0u3wrp5q7t 9",
+        ];
+
+        for e in cases {
+            assert!(e.parse::<Scru64Id>().is_err());
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod serde_support {
@@ -301,4 +442,181 @@ mod serde_support {
             Self::Value::try_from(value).map_err(de::Error::custom)
         }
     }
+
+    /// Tests serialization and deserialization.
+    #[cfg(test)]
+    #[test]
+    fn test() {
+        use serde_test::{Configure, Token};
+
+        for e in super::test_cases::TEST_CASES {
+            let x = Scru64Id::const_from_u64(e.num);
+            serde_test::assert_tokens(&x.readable(), &[Token::Str(e.text)]);
+            serde_test::assert_tokens(&x.compact(), &[Token::U64(e.num)]);
+
+            serde_test::assert_de_tokens(&x.readable(), &[Token::U64(e.num)]);
+            serde_test::assert_de_tokens(&x.readable(), &[Token::I64(e.num as i64)]);
+
+            serde_test::assert_de_tokens(&x.compact(), &[Token::Str(e.text)]);
+            serde_test::assert_de_tokens(&x.compact(), &[Token::I64(e.num as i64)]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_cases {
+    #[derive(Clone, Eq, PartialEq, Debug)]
+    pub struct PreparedCase {
+        pub text: &'static str,
+        pub num: u64,
+        pub timestamp: u64,
+        pub node_ctr: u32,
+    }
+
+    pub const TEST_CASES: &[PreparedCase] = &[
+        PreparedCase {
+            text: "000000000000",
+            num: 0x0000000000000000,
+            timestamp: 0,
+            node_ctr: 0,
+        },
+        PreparedCase {
+            text: "00000009zldr",
+            num: 0x0000000000ffffff,
+            timestamp: 0,
+            node_ctr: 16777215,
+        },
+        PreparedCase {
+            text: "zzzzzzzq0em8",
+            num: 0x41c21cb8e0000000,
+            timestamp: 282429536480,
+            node_ctr: 0,
+        },
+        PreparedCase {
+            text: "zzzzzzzzzzzz",
+            num: 0x41c21cb8e0ffffff,
+            timestamp: 282429536480,
+            node_ctr: 16777215,
+        },
+        PreparedCase {
+            text: "0u375nxqh5cq",
+            num: 0x0186d52bbe2a635a,
+            timestamp: 6557084606,
+            node_ctr: 2777946,
+        },
+        PreparedCase {
+            text: "0u375nxqh5cr",
+            num: 0x0186d52bbe2a635b,
+            timestamp: 6557084606,
+            node_ctr: 2777947,
+        },
+        PreparedCase {
+            text: "0u375nxqh5cs",
+            num: 0x0186d52bbe2a635c,
+            timestamp: 6557084606,
+            node_ctr: 2777948,
+        },
+        PreparedCase {
+            text: "0u375nxqh5ct",
+            num: 0x0186d52bbe2a635d,
+            timestamp: 6557084606,
+            node_ctr: 2777949,
+        },
+        PreparedCase {
+            text: "0u375ny0glr0",
+            num: 0x0186d52bbf2a4a1c,
+            timestamp: 6557084607,
+            node_ctr: 2771484,
+        },
+        PreparedCase {
+            text: "0u375ny0glr1",
+            num: 0x0186d52bbf2a4a1d,
+            timestamp: 6557084607,
+            node_ctr: 2771485,
+        },
+        PreparedCase {
+            text: "0u375ny0glr2",
+            num: 0x0186d52bbf2a4a1e,
+            timestamp: 6557084607,
+            node_ctr: 2771486,
+        },
+        PreparedCase {
+            text: "0u375ny0glr3",
+            num: 0x0186d52bbf2a4a1f,
+            timestamp: 6557084607,
+            node_ctr: 2771487,
+        },
+        PreparedCase {
+            text: "jdsf1we3ui4f",
+            num: 0x2367c8dfb2e6d23f,
+            timestamp: 152065073074,
+            node_ctr: 15127103,
+        },
+        PreparedCase {
+            text: "j0afcjyfyi98",
+            num: 0x22b86eaad6b2f7ec,
+            timestamp: 149123148502,
+            node_ctr: 11728876,
+        },
+        PreparedCase {
+            text: "ckzyfc271xsn",
+            num: 0x16fc214296b29057,
+            timestamp: 98719318678,
+            node_ctr: 11702359,
+        },
+        PreparedCase {
+            text: "t0vgc4c4b18n",
+            num: 0x3504295badc14f07,
+            timestamp: 227703085997,
+            node_ctr: 12668679,
+        },
+        PreparedCase {
+            text: "mwcrtcubk7bp",
+            num: 0x29d3c7553e748515,
+            timestamp: 179646715198,
+            node_ctr: 7636245,
+        },
+        PreparedCase {
+            text: "g9ye86pgplu7",
+            num: 0x1dbb24363718aecf,
+            timestamp: 127693764151,
+            node_ctr: 1617615,
+        },
+        PreparedCase {
+            text: "qmez19t9oeir",
+            num: 0x30a122fef7cd6c83,
+            timestamp: 208861855479,
+            node_ctr: 13462659,
+        },
+        PreparedCase {
+            text: "d81r595fq52m",
+            num: 0x18278838f0660f2e,
+            timestamp: 103742454000,
+            node_ctr: 6688558,
+        },
+        PreparedCase {
+            text: "v0rbps7ay8ks",
+            num: 0x38a9e683bb4425ec,
+            timestamp: 243368625083,
+            node_ctr: 4466156,
+        },
+        PreparedCase {
+            text: "z0jndjt42op2",
+            num: 0x3ff596748ea77186,
+            timestamp: 274703217806,
+            node_ctr: 10973574,
+        },
+        PreparedCase {
+            text: "f2bembkd4zrb",
+            num: 0x1b844eb5d1aebb07,
+            timestamp: 118183867857,
+            node_ctr: 11451143,
+        },
+        PreparedCase {
+            text: "mkg0fd5p76pp",
+            num: 0x29391373ab449abd,
+            timestamp: 177051235243,
+            node_ctr: 4496061,
+        },
+    ];
 }
