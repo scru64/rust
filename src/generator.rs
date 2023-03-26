@@ -242,3 +242,181 @@ impl fmt::Display for NodeSpecError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl std::error::Error for NodeSpecError {}
+
+#[cfg(test)]
+mod tests {
+    use super::{Scru64Generator, Scru64Id};
+
+    const NODE_SPECS: &[(u32, u8, &'static str)] = &[
+        (0, 1, "0/1"),
+        (1, 1, "1/1"),
+        (0, 8, "0/8"),
+        (42, 8, "42/8"),
+        (255, 8, "255/8"),
+        (0, 16, "0/16"),
+        (334, 16, "334/16"),
+        (65535, 16, "65535/16"),
+        (0, 23, "0/23"),
+        (123456, 23, "123456/23"),
+        (8388607, 23, "8388607/23"),
+    ];
+
+    /// Tests constructors.
+    #[test]
+    fn construct() {
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let x = Scru64Generator::new(node_id, node_id_size);
+            assert_eq!(x.node_id(), node_id);
+            assert_eq!(x.node_id_size(), node_id_size);
+
+            let y = Scru64Generator::parse(node_spec).unwrap();
+            assert_eq!(y.node_id(), node_id);
+            assert_eq!(y.node_id_size(), node_id_size);
+        }
+    }
+
+    /// Tests if constructor fails on invalid `node_spec` inputs.
+    #[test]
+    fn construct_error() {
+        let cases = [
+            "", " 42/8", "42/8 ", " 42/8 ", "42 / 8", "+42/8", "42/+8", "-42/8", "42/-8", "ab/8",
+            "0x42/8", "0/0", "0/24", "8/1", "1024/8",
+        ];
+
+        for e in cases {
+            assert!(Scru64Generator::parse(e).is_err());
+        }
+    }
+
+    fn test_consecutive_pair(first: Scru64Id, second: Scru64Id) {
+        assert!(first < second);
+        if first.timestamp() == second.timestamp() {
+            assert_eq!(first.node_ctr() + 1, second.node_ctr());
+        } else {
+            assert_eq!(first.timestamp() + 1, second.timestamp());
+        }
+    }
+
+    /// Tests `generate_or_reset_core()`.
+    #[test]
+    fn generate_or_reset() {
+        const N_LOOPS: usize = 64;
+        const ALLOWANCE: u64 = 10_000;
+
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let counter_size = 24 - node_id_size;
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+
+            // happy path
+            let mut ts = 1_577_836_800_000u64; // 2020-01-01
+            let mut prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts += 16;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // keep monotonic order under mildly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // reset state with significantly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts -= ALLOWANCE;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                assert!(prev > curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+        }
+    }
+
+    /// Tests `generate_or_abort_core()`.
+    #[test]
+    fn generate_or_abort() {
+        const N_LOOPS: usize = 64;
+        const ALLOWANCE: u64 = 10_000;
+
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let counter_size = 24 - node_id_size;
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+
+            // happy path
+            let mut ts = 1_577_836_800_000u64; // 2020-01-01
+            let mut prev = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            for _ in 0..N_LOOPS {
+                ts += 16;
+                let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // keep monotonic order under mildly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // abort with significantly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            ts -= ALLOWANCE;
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                assert!(g.generate_or_abort_core(ts, ALLOWANCE).is_none());
+            }
+        }
+    }
+
+    /// Tests if generator methods embed up-to-date timestamps.
+    #[cfg(feature = "std")]
+    #[test]
+    fn system_clock() {
+        fn now() -> u64 {
+            use std::time;
+            time::SystemTime::now()
+                .duration_since(time::UNIX_EPOCH)
+                .expect("clock may have gone backwards")
+                .as_millis() as u64
+                >> 8
+        }
+
+        for &(_, _, node_spec) in NODE_SPECS {
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+            let mut ts_now = now();
+            let mut x = g.generate().unwrap();
+            assert!((x.timestamp() - ts_now) <= 1);
+
+            ts_now = now();
+            x = g.generate_or_reset();
+            assert!((x.timestamp() - ts_now) <= 1);
+        }
+    }
+}
