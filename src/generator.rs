@@ -12,23 +12,24 @@ use crate::{Scru64Id, NODE_CTR_SIZE};
 ///
 /// The generator offers four different methods to generate a SCRU64 ID:
 ///
-/// | Flavor                      | Timestamp | On big clock rewind |
-/// | --------------------------- | --------- | ------------------- |
-/// | [`generate`]                | Now       | Rewinds state       |
-/// | [`generate_no_rewind`]      | Now       | Returns `None`      |
-/// | [`generate_core`]           | Argument  | Rewinds state       |
-/// | [`generate_core_no_rewind`] | Argument  | Returns `None`      |
+/// | Flavor                     | Timestamp | On big clock rewind |
+/// | -------------------------- | --------- | ------------------- |
+/// | [`generate`]               | Now       | Returns `None`      |
+/// | [`generate_or_reset`]      | Now       | Resets generator    |
+/// | [`generate_or_abort_core`] | Argument  | Returns `None`      |
+/// | [`generate_or_reset_core`] | Argument  | Resets generator    |
 ///
-/// Each method returns monotonically increasing IDs unless a timestamp provided is significantly
-/// (by ~10 seconds or more) smaller than the one embedded in the immediately preceding ID. If such
-/// a significant clock rollback is detected, the standard `generate` rewinds the generator state
-/// and returns a new ID based on the current timestamp, whereas `no_rewind` variants keep the
-/// state untouched and return `None`. `core` functions offer low-level primitives.
+/// All of these methods return monotonically increasing IDs unless a timestamp provided is
+/// significantly (by default, approx. 10 seconds or more) smaller than the one embedded in the
+/// immediately preceding ID. If such a significant clock rollback is detected, the `generate`
+/// (or_abort) method aborts and returns `None`, while the `or_reset` variants reset the generator
+/// and return a new ID based on the given timestamp. The `core` functions offer low-level
+/// primitives.
 ///
 /// [`generate`]: Scru64Generator::generate
-/// [`generate_no_rewind`]: Scru64Generator::generate_no_rewind
-/// [`generate_core`]: Scru64Generator::generate_core
-/// [`generate_core_no_rewind`]: Scru64Generator::generate_core_no_rewind
+/// [`generate_or_reset`]: Scru64Generator::generate_or_reset
+/// [`generate_or_abort_core`]: Scru64Generator::generate_or_abort_core
+/// [`generate_or_reset_core`]: Scru64Generator::generate_or_reset_core
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Scru64Generator {
     prev: Scru64Id,
@@ -69,12 +70,14 @@ impl Scru64Generator {
     pub fn parse(node_spec: &str) -> Result<Self, NodeSpecError> {
         const ERR: NodeSpecError = NodeSpecError::Syntax;
         let mut iter = node_spec.split('/');
-        let node_id: u32 = iter.next().ok_or(ERR)?.parse().or(Err(ERR))?;
-        let node_id_size: u8 = iter.next().ok_or(ERR)?.parse().or(Err(ERR))?;
-        if iter.next().is_some() {
+        let x = iter.next().ok_or(ERR)?;
+        let y = iter.next().ok_or(ERR)?;
+        if iter.next().is_some() || x.starts_with('+') || y.starts_with('+') {
             return Err(ERR);
         }
 
+        let node_id: u32 = x.parse().or(Err(ERR))?;
+        let node_id_size: u8 = y.parse().or(Err(ERR))?;
         verify_node(node_id, node_id_size)?;
         Ok(Self::new(node_id, node_id_size))
     }
@@ -93,20 +96,28 @@ impl Scru64Generator {
     fn init_node_ctr(&mut self) -> u32 {
         // initialize counter at `counter_size - 1`-bit random number
         const OVERFLOW_GUARD_SIZE: u8 = 1;
-        let counter = self.rng.gen() >> (32 + OVERFLOW_GUARD_SIZE - self.counter_size);
+        let counter = if OVERFLOW_GUARD_SIZE < self.counter_size {
+            self.rng.gen() >> (32 + OVERFLOW_GUARD_SIZE - self.counter_size)
+        } else {
+            0
+        };
 
         (self.node_id() << self.counter_size) | counter
     }
 
-    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds.
+    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, or resets the
+    /// generator upon significant timestamp rollback.
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
+    /// The `rollback_allowance` parameter specifies the amount of `unix_ts_ms` rollback that is
+    /// considered significant. A suggested value is `10_000` (milliseconds).
+    ///
     /// # Panics
     ///
-    /// Panics if the argument is not a positive integer within the valid range.
-    pub fn generate_core(&mut self, unix_ts_ms: u64) -> Scru64Id {
-        if let Some(value) = self.generate_core_no_rewind(unix_ts_ms) {
+    /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
+    pub fn generate_or_reset_core(&mut self, unix_ts_ms: u64, rollback_allowance: u64) -> Scru64Id {
+        if let Some(value) = self.generate_or_abort_core(unix_ts_ms, rollback_allowance) {
             value
         } else {
             // reset state and resume
@@ -115,24 +126,34 @@ impl Scru64Generator {
         }
     }
 
-    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, guaranteeing the
-    /// monotonic order of generated IDs despite a significant timestamp rollback.
+    /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, or returns `None`
+    /// upon significant timestamp rollback.
     ///
     /// See the [`Scru64Generator`] type documentation for the description.
     ///
+    /// The `rollback_allowance` parameter specifies the amount of `unix_ts_ms` rollback that is
+    /// considered significant. A suggested value is `10_000` (milliseconds).
+    ///
     /// # Panics
     ///
-    /// Panics if the argument is not a positive integer within the valid range.
-    pub fn generate_core_no_rewind(&mut self, unix_ts_ms: u64) -> Option<Scru64Id> {
-        const ROLLBACK_ALLOWANCE: u64 = 40; // x256 milliseconds = ~10 seconds
-
+    /// Panics if `unix_ts_ms` is not a positive integer within the valid range.
+    pub fn generate_or_abort_core(
+        &mut self,
+        unix_ts_ms: u64,
+        rollback_allowance: u64,
+    ) -> Option<Scru64Id> {
         let timestamp = unix_ts_ms >> 8;
+        let allowance = rollback_allowance >> 8;
         assert!(timestamp > 0, "`timestamp` out of range");
+        assert!(
+            allowance < (1 << 40),
+            "`rollback_allowance` out of reasonable range"
+        );
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
             self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr());
-        } else if timestamp + ROLLBACK_ALLOWANCE > prev_timestamp {
+        } else if timestamp + allowance > prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
             let counter_mask = (1u32 << self.counter_size) - 1;
@@ -143,7 +164,7 @@ impl Scru64Generator {
                 self.prev = Scru64Id::from_parts(prev_timestamp + 1, self.init_node_ctr());
             }
         } else {
-            // abort if clock moves back to unbearable extent
+            // abort if clock went backwards to unbearable extent
             return None;
         }
         Some(self.prev)
@@ -160,24 +181,25 @@ mod std_ext {
         use std::time;
         time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
-            .expect("clock may have gone backward")
+            .expect("clock may have gone backwards")
             .as_millis() as u64
     }
 
     impl Scru64Generator {
-        /// Generates a new SCRU64 ID object from the current `timestamp`.
+        /// Generates a new SCRU64 ID object from the current `timestamp`, or returns `None` upon
+        /// significant timestamp rollback.
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
-        pub fn generate(&mut self) -> Scru64Id {
-            self.generate_core(unix_ts_ms())
+        pub fn generate(&mut self) -> Option<Scru64Id> {
+            self.generate_or_abort_core(unix_ts_ms(), 10_000)
         }
 
-        /// Generates a new SCRU64 ID object from the current `timestamp`, guaranteeing the
-        /// monotonic order of generated IDs despite a significant timestamp rollback.
+        /// Generates a new SCRU64 ID object from the current `timestamp`, or resets the generator
+        /// upon significant timestamp rollback.
         ///
         /// See the [`Scru64Generator`] type documentation for the description.
-        pub fn generate_no_rewind(&mut self) -> Option<Scru64Id> {
-            self.generate_core_no_rewind(unix_ts_ms())
+        pub fn generate_or_reset(&mut self) -> Scru64Id {
+            self.generate_or_reset_core(unix_ts_ms(), 10_000)
         }
     }
 }
@@ -193,7 +215,7 @@ const fn verify_node(node_id: u32, node_id_size: u8) -> Result<(), NodeSpecError
     Ok(())
 }
 
-/// Error parsing a node spec string.
+/// An error parsing a node spec string.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum NodeSpecError {
@@ -220,3 +242,181 @@ impl fmt::Display for NodeSpecError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl std::error::Error for NodeSpecError {}
+
+#[cfg(test)]
+mod tests {
+    use super::{Scru64Generator, Scru64Id};
+
+    const NODE_SPECS: &[(u32, u8, &'static str)] = &[
+        (0, 1, "0/1"),
+        (1, 1, "1/1"),
+        (0, 8, "0/8"),
+        (42, 8, "42/8"),
+        (255, 8, "255/8"),
+        (0, 16, "0/16"),
+        (334, 16, "334/16"),
+        (65535, 16, "65535/16"),
+        (0, 23, "0/23"),
+        (123456, 23, "123456/23"),
+        (8388607, 23, "8388607/23"),
+    ];
+
+    /// Initializes with node ID and size pair and node spec string.
+    #[test]
+    fn constructor() {
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let x = Scru64Generator::new(node_id, node_id_size);
+            assert_eq!(x.node_id(), node_id);
+            assert_eq!(x.node_id_size(), node_id_size);
+
+            let y = Scru64Generator::parse(node_spec).unwrap();
+            assert_eq!(y.node_id(), node_id);
+            assert_eq!(y.node_id_size(), node_id_size);
+        }
+    }
+
+    /// Fails to initialize with invalid node spec string.
+    #[test]
+    fn constructor_error() {
+        let cases = [
+            "", " 42/8", "42/8 ", " 42/8 ", "42 / 8", "+42/8", "42/+8", "-42/8", "42/-8", "ab/8",
+            "0x42/8", "0/0", "0/24", "8/1", "1024/8",
+        ];
+
+        for e in cases {
+            assert!(Scru64Generator::parse(e).is_err());
+        }
+    }
+
+    fn test_consecutive_pair(first: Scru64Id, second: Scru64Id) {
+        assert!(first < second);
+        if first.timestamp() == second.timestamp() {
+            assert_eq!(first.node_ctr() + 1, second.node_ctr());
+        } else {
+            assert_eq!(first.timestamp() + 1, second.timestamp());
+        }
+    }
+
+    /// Normally generates monotonic IDs or resets state upon significant rollback.
+    #[test]
+    fn generate_or_reset() {
+        const N_LOOPS: usize = 64;
+        const ALLOWANCE: u64 = 10_000;
+
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let counter_size = 24 - node_id_size;
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+
+            // happy path
+            let mut ts = 1_577_836_800_000u64; // 2020-01-01
+            let mut prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts += 16;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // keep monotonic order under mildly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // reset state with significantly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_reset_core(ts, ALLOWANCE);
+            for _ in 0..N_LOOPS {
+                ts -= ALLOWANCE;
+                let curr = g.generate_or_reset_core(ts, ALLOWANCE);
+                assert!(prev > curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+        }
+    }
+
+    /// Normally generates monotonic IDs or aborts upon significant rollback.
+    #[test]
+    fn generate_or_abort() {
+        const N_LOOPS: usize = 64;
+        const ALLOWANCE: u64 = 10_000;
+
+        for &(node_id, node_id_size, node_spec) in NODE_SPECS {
+            let counter_size = 24 - node_id_size;
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+
+            // happy path
+            let mut ts = 1_577_836_800_000u64; // 2020-01-01
+            let mut prev = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            for _ in 0..N_LOOPS {
+                ts += 16;
+                let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // keep monotonic order under mildly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            prev = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+                test_consecutive_pair(prev, curr);
+                assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
+                assert!((curr.node_ctr() >> counter_size) == node_id);
+
+                prev = curr;
+            }
+
+            // abort with significantly decreasing timestamps
+            ts += ALLOWANCE * 16;
+            g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
+            ts -= ALLOWANCE;
+            for _ in 0..N_LOOPS {
+                ts -= 16;
+                assert!(g.generate_or_abort_core(ts, ALLOWANCE).is_none());
+            }
+        }
+    }
+
+    /// Embeds up-to-date timestamp.
+    #[cfg(feature = "std")]
+    #[test]
+    fn clock_integration() {
+        fn now() -> u64 {
+            use std::time;
+            time::SystemTime::now()
+                .duration_since(time::UNIX_EPOCH)
+                .expect("clock may have gone backwards")
+                .as_millis() as u64
+                >> 8
+        }
+
+        for &(_, _, node_spec) in NODE_SPECS {
+            let mut g = Scru64Generator::parse(node_spec).unwrap();
+            let mut ts_now = now();
+            let mut x = g.generate().unwrap();
+            assert!((x.timestamp() - ts_now) <= 1);
+
+            ts_now = now();
+            x = g.generate_or_reset();
+            assert!((x.timestamp() - ts_now) <= 1);
+        }
+    }
+}

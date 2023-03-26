@@ -59,7 +59,7 @@ pub use global_gen::{new, new_string};
 #[cfg(all(feature = "std", feature = "tokio"))]
 pub use global_gen::async_tokio;
 
-/// Total size in bits of the `node_id` and `counter` fields.
+/// The total size in bits of the `node_id` and `counter` fields.
 const NODE_CTR_SIZE: u8 = 24;
 
 #[cfg(feature = "std")]
@@ -83,24 +83,31 @@ mod global_gen {
         Mutex::new(g)
     });
 
-    fn generate_no_rewind() -> Option<Scru64Id> {
+    fn generate_or_abort() -> Option<Scru64Id> {
         GLOBAL_GENERATOR
             .lock()
             .unwrap_or_else(|err| panic!("scru64: could not lock global generator: {err}"))
-            .generate_no_rewind()
+            .generate()
     }
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
     /// Generates a new SCRU64 ID object using the global generator.
     ///
+    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
+    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
+    /// (e.g., `"42/8"`, `"12345/16"`).
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_tokio::new`]
+    /// for the non-blocking equivalent.
+    ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the `SCRU64_NODE_SPEC`
-    /// environment variable.
+    /// Panics if the global generator is not properly configured through the environment variable.
     pub fn new() -> Scru64Id {
         loop {
-            if let Some(value) = generate_no_rewind() {
+            if let Some(value) = generate_or_abort() {
                 break value;
             } else {
                 thread::sleep(DELAY);
@@ -111,10 +118,17 @@ mod global_gen {
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
     ///
+    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
+    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
+    /// (e.g., `"42/8"`, `"12345/16"`).
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick. It employs blocking sleep to wait; see
+    /// [`async_tokio::new_string`] for the non-blocking equivalent.
+    ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the `SCRU64_NODE_SPEC`
-    /// environment variable.
+    /// Panics if the global generator is not properly configured through the environment variable.
     pub fn new_string() -> String {
         new().into()
     }
@@ -123,17 +137,24 @@ mod global_gen {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub mod async_tokio {
-        use super::{generate_no_rewind, Scru64Id, DELAY};
+        use super::{generate_or_abort, Scru64Id, DELAY};
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
+        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
+        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        ///
+        /// This function usually returns a value immediately, but if not possible, it sleeps and
+        /// waits for the next timestamp tick.
+        ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the
-        /// `SCRU64_NODE_SPEC` environment variable.
+        /// Panics if the global generator is not properly configured through the environment
+        /// variable.
         pub async fn new() -> Scru64Id {
             loop {
-                if let Some(value) = generate_no_rewind() {
+                if let Some(value) = generate_or_abort() {
                     break value;
                 } else {
                     tokio::time::sleep(DELAY).await;
@@ -144,13 +165,20 @@ mod global_gen {
         /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using
         /// the global generator.
         ///
+        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
+        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        ///
+        /// This function usually returns a value immediately, but if not possible, it sleeps and
+        /// waits for the next timestamp tick.
+        ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the
-        /// `SCRU64_NODE_SPEC` environment variable.
+        /// Panics if the global generator is not properly configured through the environment
+        /// variable.
         pub async fn new_string() -> String {
             loop {
-                if let Some(value) = generate_no_rewind() {
+                if let Some(value) = generate_or_abort() {
                     break value.into();
                 } else {
                     tokio::time::sleep(DELAY).await;
