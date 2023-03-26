@@ -261,9 +261,9 @@ mod tests {
         (8388607, 23, "8388607/23"),
     ];
 
-    /// Tests constructors.
+    /// Initializes with node ID and size pair and node spec string.
     #[test]
-    fn construct() {
+    fn constructor() {
         for &(node_id, node_id_size, node_spec) in NODE_SPECS {
             let x = Scru64Generator::new(node_id, node_id_size);
             assert_eq!(x.node_id(), node_id);
@@ -275,9 +275,9 @@ mod tests {
         }
     }
 
-    /// Tests if constructor fails on invalid `node_spec` inputs.
+    /// Fails to initialize with invalid node spec string.
     #[test]
-    fn construct_error() {
+    fn constructor_error() {
         let cases = [
             "", " 42/8", "42/8 ", " 42/8 ", "42 / 8", "+42/8", "42/+8", "-42/8", "42/-8", "ab/8",
             "0x42/8", "0/0", "0/24", "8/1", "1024/8",
@@ -297,7 +297,7 @@ mod tests {
         }
     }
 
-    /// Tests `generate_or_reset_core()`.
+    /// Normally generates monotonic IDs or resets state upon significant rollback.
     #[test]
     fn generate_or_reset() {
         const N_LOOPS: usize = 64;
@@ -348,7 +348,7 @@ mod tests {
         }
     }
 
-    /// Tests `generate_or_abort_core()`.
+    /// Normally generates monotonic IDs or aborts upon significant rollback.
     #[test]
     fn generate_or_abort() {
         const N_LOOPS: usize = 64;
@@ -395,10 +395,10 @@ mod tests {
         }
     }
 
-    /// Tests if generator methods embed up-to-date timestamps.
+    /// Embeds up-to-date timestamp.
     #[cfg(feature = "std")]
     #[test]
-    fn system_clock() {
+    fn clock_integration() {
         fn now() -> u64 {
             use std::time;
             time::SystemTime::now()

@@ -258,7 +258,7 @@ mod std_ext {
 mod tests {
     use super::{test_cases::TEST_CASES, Scru64Id};
 
-    /// Tests equality comparison.
+    /// Supports equality comparison.
     #[test]
     fn eq() {
         #[cfg(feature = "std")]
@@ -300,7 +300,7 @@ mod tests {
         }
     }
 
-    /// Tests ordering comparison.
+    /// Supports ordering comparison.
     #[test]
     fn ord() {
         let mut cases = TEST_CASES.to_vec();
@@ -320,7 +320,7 @@ mod tests {
         }
     }
 
-    /// Tests conversion-to methods.
+    /// Converts to various types.
     #[test]
     fn convert_to() {
         for e in TEST_CASES {
@@ -341,7 +341,7 @@ mod tests {
         }
     }
 
-    /// Tests conversion-from methods.
+    /// Converts from various types.
     #[test]
     fn convert_from() {
         for e in TEST_CASES {
@@ -361,7 +361,7 @@ mod tests {
         }
     }
 
-    /// Tests if conversion from too large or small integer fails.
+    /// Rejects integer out of valid range.
     #[test]
     fn from_int_error() {
         assert!(Scru64Id::try_from(36u64.pow(12)).is_err());
@@ -372,7 +372,7 @@ mod tests {
         assert!(Scru64Id::try_from(i64::MIN).is_err());
     }
 
-    /// Tests if conversion from invalid string representation fails.
+    /// Fails to parse invalid textual representations.
     #[test]
     fn parse_error() {
         let cases = [
@@ -443,7 +443,7 @@ mod serde_support {
         }
     }
 
-    /// Tests serialization and deserialization.
+    /// Supports serialization and deserialization.
     #[cfg(test)]
     #[test]
     fn test() {
