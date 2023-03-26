@@ -72,7 +72,12 @@ impl Scru64Generator {
         let mut iter = node_spec.split('/');
         let x = iter.next().ok_or(ERR)?;
         let y = iter.next().ok_or(ERR)?;
-        if iter.next().is_some() || x.starts_with('+') || y.starts_with('+') {
+        if iter.next().is_some()
+            || x.starts_with('+')
+            || x.len() > 10
+            || y.starts_with('+')
+            || y.len() > 3
+        {
             return Err(ERR);
         }
 
@@ -279,8 +284,27 @@ mod tests {
     #[test]
     fn constructor_error() {
         let cases = [
-            "", " 42/8", "42/8 ", " 42/8 ", "42 / 8", "+42/8", "42/+8", "-42/8", "42/-8", "ab/8",
-            "0x42/8", "0/0", "0/24", "8/1", "1024/8",
+            "",
+            "42",
+            "/8",
+            "42/",
+            " 42/8",
+            "42/8 ",
+            " 42/8 ",
+            "42 / 8",
+            "+42/8",
+            "42/+8",
+            "-42/8",
+            "42/-8",
+            "ab/8",
+            "0x42/8",
+            "1/2/3",
+            "0/0",
+            "0/24",
+            "8/1",
+            "1024/8",
+            "00000000001/8",
+            "1/0016",
         ];
 
         for e in cases {
