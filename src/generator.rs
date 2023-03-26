@@ -70,12 +70,14 @@ impl Scru64Generator {
     pub fn parse(node_spec: &str) -> Result<Self, NodeSpecError> {
         const ERR: NodeSpecError = NodeSpecError::Syntax;
         let mut iter = node_spec.split('/');
-        let node_id: u32 = iter.next().ok_or(ERR)?.parse().or(Err(ERR))?;
-        let node_id_size: u8 = iter.next().ok_or(ERR)?.parse().or(Err(ERR))?;
-        if iter.next().is_some() {
+        let x = iter.next().ok_or(ERR)?;
+        let y = iter.next().ok_or(ERR)?;
+        if iter.next().is_some() || x.starts_with('+') || y.starts_with('+') {
             return Err(ERR);
         }
 
+        let node_id: u32 = x.parse().or(Err(ERR))?;
+        let node_id_size: u8 = y.parse().or(Err(ERR))?;
         verify_node(node_id, node_id_size)?;
         Ok(Self::new(node_id, node_id_size))
     }
@@ -94,7 +96,11 @@ impl Scru64Generator {
     fn init_node_ctr(&mut self) -> u32 {
         // initialize counter at `counter_size - 1`-bit random number
         const OVERFLOW_GUARD_SIZE: u8 = 1;
-        let counter = self.rng.gen() >> (32 + OVERFLOW_GUARD_SIZE - self.counter_size);
+        let counter = if OVERFLOW_GUARD_SIZE < self.counter_size {
+            self.rng.gen() >> (32 + OVERFLOW_GUARD_SIZE - self.counter_size)
+        } else {
+            0
+        };
 
         (self.node_id() << self.counter_size) | counter
     }
@@ -175,7 +181,7 @@ mod std_ext {
         use std::time;
         time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
-            .expect("clock may have gone backward")
+            .expect("clock may have gone backwards")
             .as_millis() as u64
     }
 
