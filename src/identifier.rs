@@ -195,7 +195,7 @@ impl TryFrom<i64> for Scru64Id {
 
 impl fmt::Display for Scru64Id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.encode())
+        fmt::Display::fmt(self.encode().as_str(), f)
     }
 }
 
@@ -337,6 +337,9 @@ mod tests {
             {
                 assert_eq!(x.to_string(), e.text);
                 assert_eq!(String::from(x), e.text);
+                assert_eq!(format!("{}", x), format!("{}", e.text));
+                assert_eq!(format!("{:016}", x), format!("{:016}", e.text));
+                assert_eq!(format!("{:-^024}", x), format!("{:-^024}", e.text));
             }
         }
     }
