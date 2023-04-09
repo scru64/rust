@@ -313,21 +313,7 @@ impl std::error::Error for NodeSpecError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Scru64Generator, Scru64Id};
-
-    const NODE_SPECS: &[(u32, u8, &'static str)] = &[
-        (0, 1, "0/1"),
-        (1, 1, "1/1"),
-        (0, 8, "0/8"),
-        (42, 8, "42/8"),
-        (255, 8, "255/8"),
-        (0, 16, "0/16"),
-        (334, 16, "334/16"),
-        (65535, 16, "65535/16"),
-        (0, 23, "0/23"),
-        (123456, 23, "123456/23"),
-        (8388607, 23, "8388607/23"),
-    ];
+    use super::{test_cases::NODE_SPECS, Scru64Generator, Scru64Id};
 
     /// Initializes with node ID and size pair and node spec string.
     #[test]
@@ -506,4 +492,102 @@ mod tests {
             assert!((x.timestamp() - ts_now) <= 1);
         }
     }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+mod serde_support {
+    #[cfg(not(feature = "std"))]
+    use core as std;
+    use std::{fmt, str};
+
+    use super::Scru64Generator;
+    use serde::{de, Deserializer, Serializer};
+
+    impl serde::Serialize for Scru64Generator {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let mut buffer = fstr::FStr::<16>::repeat(b'\0');
+            self.write_node_spec(&mut buffer.writer()).unwrap();
+            serializer.serialize_str(buffer.slice_to_terminator('\0'))
+        }
+    }
+
+    impl<'de> serde::Deserialize<'de> for Scru64Generator {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            deserializer.deserialize_str(VisitorImpl)
+        }
+    }
+
+    struct VisitorImpl;
+
+    impl<'de> de::Visitor<'de> for VisitorImpl {
+        type Value = Scru64Generator;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(formatter, "a SCRU64 node spec string")
+        }
+
+        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            Self::Value::parse(value).map_err(de::Error::custom)
+        }
+
+        fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<Self::Value, E> {
+            match str::from_utf8(value) {
+                Ok(str_value) => self.visit_str(str_value),
+                _ => Err(de::Error::invalid_value(
+                    de::Unexpected::Bytes(value),
+                    &self,
+                )),
+            }
+        }
+    }
+
+    /// Supports serialization and deserialization.
+    #[cfg(test)]
+    #[test]
+    fn test() {
+        use serde::{Deserialize, Serialize};
+        use serde_test::Token;
+
+        #[derive(Debug)]
+        struct CustomEqWrapper(Scru64Generator);
+        impl PartialEq for CustomEqWrapper {
+            fn eq(&self, other: &CustomEqWrapper) -> bool {
+                self.0.prev == other.0.prev && self.0.counter_size == other.0.counter_size
+            }
+        }
+        impl Serialize for CustomEqWrapper {
+            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                Scru64Generator::serialize(&self.0, serializer)
+            }
+        }
+        impl<'de> Deserialize<'de> for CustomEqWrapper {
+            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                Ok(CustomEqWrapper(Scru64Generator::deserialize(deserializer)?))
+            }
+        }
+
+        for e in super::test_cases::NODE_SPECS {
+            let x = CustomEqWrapper(Scru64Generator::parse(e.2).unwrap());
+            serde_test::assert_tokens(&x, &[Token::Str(e.2)]);
+            serde_test::assert_de_tokens(&x, &[Token::Bytes(e.2.as_bytes())]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_cases {
+    pub const NODE_SPECS: &[(u32, u8, &'static str)] = &[
+        (0, 1, "0/1"),
+        (1, 1, "1/1"),
+        (0, 8, "0/8"),
+        (42, 8, "42/8"),
+        (255, 8, "255/8"),
+        (0, 16, "0/16"),
+        (334, 16, "334/16"),
+        (65535, 16, "65535/16"),
+        (0, 23, "0/23"),
+        (123456, 23, "123456/23"),
+        (8388607, 23, "8388607/23"),
+    ];
 }
