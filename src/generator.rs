@@ -38,7 +38,7 @@ pub struct Scru64Generator {
 }
 
 impl Scru64Generator {
-    /// Creates a generator with a node configuration.
+    /// Creates a new generator with a given node configuration.
     ///
     /// The `node_id` must fit in `node_id_size` bits, where `node_id_size` ranges from 1 to 23,
     /// inclusive.
@@ -48,43 +48,67 @@ impl Scru64Generator {
     /// Panics if the arguments represent an invalid node configuration.
     pub fn new(node_id: u32, node_id_size: u8) -> Self {
         verify_node(node_id, node_id_size).unwrap_or_else(|err| panic!("{err}"));
+        Self::restore(
+            Scru64Id::from_parts(0, node_id << (NODE_CTR_SIZE - node_id_size)),
+            node_id_size,
+        )
+    }
+
+    /// Restores the generator state from the immediately preceding SCRU64 ID and `node_id_size`
+    /// parameter.
+    ///
+    /// The returned generator refers to `node_prev` as the source of `node_id` and as the
+    /// preceding ID when generating a monotonically increasing ID.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `node_id_size` is zero or greater than 23.
+    pub fn restore(node_prev: Scru64Id, node_id_size: u8) -> Self {
+        verify_node_id_size(node_id_size).unwrap_or_else(|err| panic!("{err}"));
         let counter_size = NODE_CTR_SIZE - node_id_size;
-        let prev = Scru64Id::from_parts(0, node_id << counter_size);
         let seed = &counter_size as *const u8; // use local var address as seed
         Self {
-            prev,
+            prev: node_prev,
             counter_size,
-            rng: Pcg32::new(prev.to_u64(), seed as u64),
+            rng: Pcg32::new(node_prev.to_u64(), seed as u64),
         }
     }
 
     /// Creates a generator by parsing a node spec string that describes the node configuration.
     ///
-    /// A node spec string consists of `node_id` and `node_id_size` separated by a slash (e.g.,
-    /// `"42/8"`, `"12345/16"`).
+    /// A node spec string starts with a decimal `node_id` or 12-digit `node_prev` value, followed
+    /// by a slash and a decimal `node_id_size` value ranging from 1 to 23 (e.g., `"42/8"`,
+    /// `"0u2r85hm2pt3/16"`). The first form creates a fresh new generator with the given `node_id`,
+    /// while the second form constructs one that generates subsequent IDs to the `node_prev`.
     ///
     /// # Errors
     ///
     /// Returns `Err` if the node spec does not conform to the valid syntax or represents an
     /// invalid node configuration.
     pub fn parse(node_spec: &str) -> Result<Self, NodeSpecError> {
-        const ERR: NodeSpecError = NodeSpecError::Syntax;
+        use NodeSpecError::Syntax;
         let mut iter = node_spec.split('/');
-        let x = iter.next().ok_or(ERR)?;
-        let y = iter.next().ok_or(ERR)?;
+        let x = iter.next().ok_or(Syntax)?;
+        let y = iter.next().ok_or(Syntax)?;
         if iter.next().is_some()
             || x.starts_with('+')
-            || x.len() > 10
+            || x.len() > 12
             || y.starts_with('+')
             || y.len() > 3
         {
-            return Err(ERR);
+            return Err(Syntax);
         }
 
-        let node_id: u32 = x.parse().or(Err(ERR))?;
-        let node_id_size: u8 = y.parse().or(Err(ERR))?;
-        verify_node(node_id, node_id_size)?;
-        Ok(Self::new(node_id, node_id_size))
+        let node_id_size: u8 = y.parse().or(Err(Syntax))?;
+        if x.len() == 12 {
+            let node_prev = x.parse().or(Err(Syntax))?;
+            verify_node_id_size(node_id_size)?;
+            Ok(Self::restore(node_prev, node_id_size))
+        } else {
+            let node_id = x.parse().or(Err(Syntax))?;
+            verify_node(node_id, node_id_size)?;
+            Ok(Self::new(node_id, node_id_size))
+        }
     }
 
     /// Returns the immediately preceding ID that the generator generated.
@@ -237,15 +261,24 @@ mod std_ext {
     }
 }
 
+/// Tests if `node_id_size` is within the valid value range.
+const fn verify_node_id_size(node_id_size: u8) -> Result<(), NodeSpecError> {
+    if 0 < node_id_size && node_id_size < NODE_CTR_SIZE {
+        Ok(())
+    } else {
+        Err(NodeSpecError::NodeSizeRange)
+    }
+}
+
 /// Tests if a pair of `node_id` and `node_id_size` is valid.
 const fn verify_node(node_id: u32, node_id_size: u8) -> Result<(), NodeSpecError> {
-    if node_id_size == 0 || node_id_size >= NODE_CTR_SIZE {
-        return Err(NodeSpecError::NodeSizeRange);
+    match verify_node_id_size(node_id_size) {
+        Ok(_) => match node_id >> node_id_size {
+            0 => Ok(()),
+            _ => Err(NodeSpecError::NodeRange),
+        },
+        err => err,
     }
-    if (node_id >> node_id_size) > 0 {
-        return Err(NodeSpecError::NodeRange);
-    }
-    Ok(())
 }
 
 /// An error parsing a node spec string.
@@ -265,7 +298,9 @@ pub enum NodeSpecError {
 impl fmt::Display for NodeSpecError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Syntax => f.write_str("invalid `node_spec`; it looks like: `42/8`, `12345/16`"),
+            Self::Syntax => {
+                f.write_str("invalid `node_spec`; it looks like: `42/8`, `0u2r85hm2pt3/16`")
+            }
             Self::NodeRange => f.write_str("`node_id` must fit in `node_id_size` bits"),
             Self::NodeSizeRange => f.write_str("`node_id_size` must range from 1 to 23"),
         }
@@ -331,7 +366,7 @@ mod tests {
             "0/24",
             "8/1",
             "1024/8",
-            "00000000001/8",
+            "0000000000001/8",
             "1/0016",
         ];
 
