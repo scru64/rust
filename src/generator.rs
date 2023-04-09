@@ -87,6 +87,15 @@ impl Scru64Generator {
         Ok(Self::new(node_id, node_id_size))
     }
 
+    /// Returns the immediately preceding ID that the generator generated.
+    pub const fn node_prev(&self) -> Option<Scru64Id> {
+        if self.prev.timestamp() > 0 {
+            Some(self.prev)
+        } else {
+            None
+        }
+    }
+
     /// Returns the `node_id` of the generator.
     pub const fn node_id(&self) -> u32 {
         self.prev.node_ctr() >> self.counter_size
@@ -95,6 +104,16 @@ impl Scru64Generator {
     /// Returns the size in bits of the `node_id` adopted by the generator.
     pub const fn node_id_size(&self) -> u8 {
         NODE_CTR_SIZE - self.counter_size
+    }
+
+    /// Writes the node spec string describing `self` into a `buffer`.
+    #[cfg_attr(not(feature = "std"), allow(dead_code))]
+    fn write_node_spec(&self, buffer: &mut impl fmt::Write) -> fmt::Result {
+        if let Some(prev) = self.node_prev() {
+            write!(buffer, "{}/{}", prev, self.node_id_size())
+        } else {
+            write!(buffer, "{}/{}", self.node_id(), self.node_id_size())
+        }
     }
 
     /// Calculates the combined `node_ctr` field value for the next `timestamp` tick.
@@ -191,6 +210,15 @@ mod std_ext {
     }
 
     impl Scru64Generator {
+        /// Returns the node spec string that revives the current generator state through
+        /// [`Scru64Generator::parse`].
+        pub fn node_spec(&self) -> String {
+            let mut buffer = String::new();
+            self.write_node_spec(&mut buffer)
+                .expect("could not write `node_spec` into `String`");
+            buffer
+        }
+
         /// Generates a new SCRU64 ID object from the current `timestamp`, or returns `None` upon
         /// significant timestamp rollback.
         ///
