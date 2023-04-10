@@ -266,7 +266,7 @@ const fn verify_node_id_size(node_id_size: u8) -> Result<(), NodeSpecError> {
     if 0 < node_id_size && node_id_size < NODE_CTR_SIZE {
         Ok(())
     } else {
-        Err(NodeSpecError::NodeSizeRange)
+        Err(NodeSpecError::NodeIdSizeRange)
     }
 }
 
@@ -275,7 +275,7 @@ const fn verify_node(node_id: u32, node_id_size: u8) -> Result<(), NodeSpecError
     match verify_node_id_size(node_id_size) {
         Ok(_) => match node_id >> node_id_size {
             0 => Ok(()),
-            _ => Err(NodeSpecError::NodeRange),
+            _ => Err(NodeSpecError::NodeIdRange),
         },
         err => err,
     }
@@ -289,10 +289,10 @@ pub enum NodeSpecError {
     Syntax,
 
     /// `node_id` is greater than the `node_id_size` range.
-    NodeRange,
+    NodeIdRange,
 
     /// `node_id_size` is zero or greater than 23.
-    NodeSizeRange,
+    NodeIdSizeRange,
 }
 
 impl fmt::Display for NodeSpecError {
@@ -301,8 +301,8 @@ impl fmt::Display for NodeSpecError {
             Self::Syntax => {
                 f.write_str("invalid `node_spec`; it looks like: `42/8`, `0u2r85hm2pt3/16`")
             }
-            Self::NodeRange => f.write_str("`node_id` must fit in `node_id_size` bits"),
-            Self::NodeSizeRange => f.write_str("`node_id_size` must range from 1 to 23"),
+            Self::NodeIdRange => f.write_str("`node_id` must fit in `node_id_size` bits"),
+            Self::NodeIdSizeRange => f.write_str("`node_id_size` must range from 1 to 23"),
         }
     }
 }
