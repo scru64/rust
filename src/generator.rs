@@ -8,6 +8,13 @@ use pcg32::Pcg32;
 
 use crate::{Scru64Id, NODE_CTR_SIZE};
 
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+mod global_gen;
+
+#[cfg(feature = "std")]
+pub use global_gen::GlobalGenerator;
+
 /// Represents a SCRU64 ID generator.
 ///
 /// The generator offers four different methods to generate a SCRU64 ID:

@@ -54,10 +54,10 @@ mod identifier;
 pub use identifier::{ConversionError, Scru64Id};
 
 #[cfg(feature = "std")]
-pub use global_gen::{new, new_string};
+pub use shortcut::{new, new_string};
 
 #[cfg(all(feature = "std", feature = "tokio"))]
-pub use global_gen::async_tokio;
+pub use shortcut::async_tokio;
 
 #[cfg(test)]
 mod test_cases;
@@ -67,31 +67,10 @@ const NODE_CTR_SIZE: u8 = 24;
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-mod global_gen {
-    use std::{env, sync::Mutex, thread, time};
+mod shortcut {
+    use std::{thread, time};
 
-    use once_cell::sync::Lazy;
-
-    use crate::{generator::Scru64Generator, Scru64Id};
-
-    static GLOBAL_GENERATOR: Lazy<Mutex<Scru64Generator>> = Lazy::new(|| {
-        let g = match env::var("SCRU64_NODE_SPEC") {
-            Err(err) => {
-                panic!("scru64: could not read config from SCRU64_NODE_SPEC env var: {err}")
-            }
-            Ok(node_spec) => Scru64Generator::parse(&node_spec).unwrap_or_else(|err| {
-                panic!("scru64: could not initialize global generator: {err}")
-            }),
-        };
-        Mutex::new(g)
-    });
-
-    fn generate_or_abort() -> Option<Scru64Id> {
-        GLOBAL_GENERATOR
-            .lock()
-            .unwrap_or_else(|err| panic!("scru64: could not lock global generator: {err}"))
-            .generate()
-    }
+    use crate::{generator::GlobalGenerator, Scru64Id};
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
@@ -110,7 +89,7 @@ mod global_gen {
     /// Panics if the global generator is not properly configured through the environment variable.
     pub fn new() -> Scru64Id {
         loop {
-            if let Some(value) = generate_or_abort() {
+            if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
                 thread::sleep(DELAY);
@@ -140,7 +119,7 @@ mod global_gen {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub mod async_tokio {
-        use super::{generate_or_abort, Scru64Id, DELAY};
+        use super::{GlobalGenerator, Scru64Id, DELAY};
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
@@ -157,7 +136,7 @@ mod global_gen {
         /// variable.
         pub async fn new() -> Scru64Id {
             loop {
-                if let Some(value) = generate_or_abort() {
+                if let Some(value) = GlobalGenerator.generate() {
                     break value;
                 } else {
                     tokio::time::sleep(DELAY).await;
@@ -181,7 +160,7 @@ mod global_gen {
         /// variable.
         pub async fn new_string() -> String {
             loop {
-                if let Some(value) = generate_or_abort() {
+                if let Some(value) = GlobalGenerator.generate() {
                     break value.into();
                 } else {
                     tokio::time::sleep(DELAY).await;
