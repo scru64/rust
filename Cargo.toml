@@ -13,13 +13,13 @@ std = ["fstr/std", "once_cell"]
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }
-once_cell = { version = "1.17.1", optional = true }
-pcg32 = { version = "0.1.0", default-features = false }
-serde = { version = "1.0.158", default-features = false, optional = true }
-tokio = { version = "1.26.0", features = ["time"], optional = true }
+once_cell = { version = "1.17", optional = true }
+pcg32 = { version = "0.1", default-features = false }
+serde = { version = "1.0", default-features = false, optional = true }
+tokio = { version = "1.27", features = ["time"], optional = true }
 
 [dev-dependencies]
-serde_test = { version = "1.0.158", default-features = false }
+serde_test = { version = "1.0", default-features = false }
 
 [package.metadata.docs.rs]
 # RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
