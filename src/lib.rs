@@ -59,6 +59,9 @@ pub use global_gen::{new, new_string};
 #[cfg(all(feature = "std", feature = "tokio"))]
 pub use global_gen::async_tokio;
 
+#[cfg(test)]
+mod test_cases;
+
 /// The total size in bits of the `node_id` and `counter` fields.
 const NODE_CTR_SIZE: u8 = 24;
 

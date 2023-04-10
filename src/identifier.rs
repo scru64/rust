@@ -256,7 +256,8 @@ mod std_ext {
 
 #[cfg(test)]
 mod tests {
-    use super::{test_cases::TEST_CASES, Scru64Id};
+    use super::Scru64Id;
+    use crate::test_cases::EXAMPLE_IDS;
 
     /// Supports equality comparison.
     #[test]
@@ -272,8 +273,8 @@ mod tests {
             }
         };
 
-        let mut prev = Scru64Id::const_from_u64(TEST_CASES.last().unwrap().num);
-        for e in TEST_CASES {
+        let mut prev = Scru64Id::const_from_u64(EXAMPLE_IDS.last().unwrap().num);
+        for e in EXAMPLE_IDS {
             let curr = Scru64Id::const_from_u64(e.num);
             let twin = Scru64Id::const_from_u64(e.num);
 
@@ -303,7 +304,7 @@ mod tests {
     /// Supports ordering comparison.
     #[test]
     fn ord() {
-        let mut cases = TEST_CASES.to_vec();
+        let mut cases = EXAMPLE_IDS.to_vec();
         cases.sort_by_key(|e| e.num);
 
         let mut prev = Scru64Id::const_from_u64(cases[0].num);
@@ -323,7 +324,7 @@ mod tests {
     /// Converts to various types.
     #[test]
     fn convert_to() {
-        for e in TEST_CASES {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
 
             assert_eq!(x.to_u64(), e.num);
@@ -347,7 +348,7 @@ mod tests {
     /// Converts from various types.
     #[test]
     fn convert_from() {
-        for e in TEST_CASES {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
 
             assert_eq!(x, (e.num as u64).try_into().unwrap());
@@ -452,7 +453,7 @@ mod serde_support {
     fn test() {
         use serde_test::{Configure, Token};
 
-        for e in super::test_cases::TEST_CASES {
+        for e in crate::test_cases::EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
             serde_test::assert_tokens(&x.readable(), &[Token::Str(e.text)]);
             serde_test::assert_tokens(&x.compact(), &[Token::U64(e.num)]);
@@ -464,162 +465,4 @@ mod serde_support {
             serde_test::assert_de_tokens(&x.compact(), &[Token::I64(e.num as i64)]);
         }
     }
-}
-
-#[cfg(test)]
-mod test_cases {
-    #[derive(Clone, Eq, PartialEq, Debug)]
-    pub struct PreparedCase {
-        pub text: &'static str,
-        pub num: u64,
-        pub timestamp: u64,
-        pub node_ctr: u32,
-    }
-
-    pub const TEST_CASES: &[PreparedCase] = &[
-        PreparedCase {
-            text: "000000000000",
-            num: 0x0000000000000000,
-            timestamp: 0,
-            node_ctr: 0,
-        },
-        PreparedCase {
-            text: "00000009zldr",
-            num: 0x0000000000ffffff,
-            timestamp: 0,
-            node_ctr: 16777215,
-        },
-        PreparedCase {
-            text: "zzzzzzzq0em8",
-            num: 0x41c21cb8e0000000,
-            timestamp: 282429536480,
-            node_ctr: 0,
-        },
-        PreparedCase {
-            text: "zzzzzzzzzzzz",
-            num: 0x41c21cb8e0ffffff,
-            timestamp: 282429536480,
-            node_ctr: 16777215,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cq",
-            num: 0x0186d52bbe2a635a,
-            timestamp: 6557084606,
-            node_ctr: 2777946,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cr",
-            num: 0x0186d52bbe2a635b,
-            timestamp: 6557084606,
-            node_ctr: 2777947,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cs",
-            num: 0x0186d52bbe2a635c,
-            timestamp: 6557084606,
-            node_ctr: 2777948,
-        },
-        PreparedCase {
-            text: "0u375nxqh5ct",
-            num: 0x0186d52bbe2a635d,
-            timestamp: 6557084606,
-            node_ctr: 2777949,
-        },
-        PreparedCase {
-            text: "0u375ny0glr0",
-            num: 0x0186d52bbf2a4a1c,
-            timestamp: 6557084607,
-            node_ctr: 2771484,
-        },
-        PreparedCase {
-            text: "0u375ny0glr1",
-            num: 0x0186d52bbf2a4a1d,
-            timestamp: 6557084607,
-            node_ctr: 2771485,
-        },
-        PreparedCase {
-            text: "0u375ny0glr2",
-            num: 0x0186d52bbf2a4a1e,
-            timestamp: 6557084607,
-            node_ctr: 2771486,
-        },
-        PreparedCase {
-            text: "0u375ny0glr3",
-            num: 0x0186d52bbf2a4a1f,
-            timestamp: 6557084607,
-            node_ctr: 2771487,
-        },
-        PreparedCase {
-            text: "jdsf1we3ui4f",
-            num: 0x2367c8dfb2e6d23f,
-            timestamp: 152065073074,
-            node_ctr: 15127103,
-        },
-        PreparedCase {
-            text: "j0afcjyfyi98",
-            num: 0x22b86eaad6b2f7ec,
-            timestamp: 149123148502,
-            node_ctr: 11728876,
-        },
-        PreparedCase {
-            text: "ckzyfc271xsn",
-            num: 0x16fc214296b29057,
-            timestamp: 98719318678,
-            node_ctr: 11702359,
-        },
-        PreparedCase {
-            text: "t0vgc4c4b18n",
-            num: 0x3504295badc14f07,
-            timestamp: 227703085997,
-            node_ctr: 12668679,
-        },
-        PreparedCase {
-            text: "mwcrtcubk7bp",
-            num: 0x29d3c7553e748515,
-            timestamp: 179646715198,
-            node_ctr: 7636245,
-        },
-        PreparedCase {
-            text: "g9ye86pgplu7",
-            num: 0x1dbb24363718aecf,
-            timestamp: 127693764151,
-            node_ctr: 1617615,
-        },
-        PreparedCase {
-            text: "qmez19t9oeir",
-            num: 0x30a122fef7cd6c83,
-            timestamp: 208861855479,
-            node_ctr: 13462659,
-        },
-        PreparedCase {
-            text: "d81r595fq52m",
-            num: 0x18278838f0660f2e,
-            timestamp: 103742454000,
-            node_ctr: 6688558,
-        },
-        PreparedCase {
-            text: "v0rbps7ay8ks",
-            num: 0x38a9e683bb4425ec,
-            timestamp: 243368625083,
-            node_ctr: 4466156,
-        },
-        PreparedCase {
-            text: "z0jndjt42op2",
-            num: 0x3ff596748ea77186,
-            timestamp: 274703217806,
-            node_ctr: 10973574,
-        },
-        PreparedCase {
-            text: "f2bembkd4zrb",
-            num: 0x1b844eb5d1aebb07,
-            timestamp: 118183867857,
-            node_ctr: 11451143,
-        },
-        PreparedCase {
-            text: "mkg0fd5p76pp",
-            num: 0x29391373ab449abd,
-            timestamp: 177051235243,
-            node_ctr: 4496061,
-        },
-    ];
 }

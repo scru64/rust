@@ -313,17 +313,21 @@ impl std::error::Error for NodeSpecError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{test_cases::NODE_SPECS, Scru64Generator, Scru64Id};
+    use super::{Scru64Generator, Scru64Id};
+    use crate::test_cases::EXAMPLE_NODE_SPECS;
 
     /// Initializes with node ID and size pair and node spec string.
     #[test]
     fn constructor() {
-        for e in NODE_SPECS {
+        for e in EXAMPLE_NODE_SPECS {
             let node_prev = Scru64Id::const_from_u64(e.node_prev);
 
             let newed = Scru64Generator::new(e.node_id, e.node_id_size);
             assert_eq!(newed.node_id(), e.node_id);
             assert_eq!(newed.node_id_size(), e.node_id_size);
+            if e.spec_type == "new" {
+                assert_eq!(newed.prev, node_prev);
+            }
 
             let parsed = Scru64Generator::parse(e.node_spec).unwrap();
             assert_eq!(parsed.node_id(), e.node_id);
@@ -337,6 +341,9 @@ mod tests {
 
             #[cfg(feature = "std")]
             {
+                if e.spec_type == "new" {
+                    assert_eq!(newed.node_spec(), e.node_spec);
+                }
                 assert_eq!(parsed.node_spec(), e.node_spec);
                 assert_eq!(restored.node_spec(), e.node_spec);
             }
@@ -390,7 +397,7 @@ mod tests {
         const N_LOOPS: usize = 64;
         const ALLOWANCE: u64 = 10_000;
 
-        for e in NODE_SPECS {
+        for e in EXAMPLE_NODE_SPECS {
             let counter_size = 24 - e.node_id_size;
             let mut g = Scru64Generator::new(e.node_id, e.node_id_size);
 
@@ -441,7 +448,7 @@ mod tests {
         const N_LOOPS: usize = 64;
         const ALLOWANCE: u64 = 10_000;
 
-        for e in NODE_SPECS {
+        for e in EXAMPLE_NODE_SPECS {
             let counter_size = 24 - e.node_id_size;
             let mut g = Scru64Generator::new(e.node_id, e.node_id_size);
 
@@ -495,7 +502,7 @@ mod tests {
                 >> 8
         }
 
-        for e in NODE_SPECS {
+        for e in EXAMPLE_NODE_SPECS {
             let mut g = Scru64Generator::new(e.node_id, e.node_id_size);
             let mut ts_now = now();
             let mut x = g.generate().unwrap();
@@ -581,186 +588,10 @@ mod serde_support {
             }
         }
 
-        for e in super::test_cases::NODE_SPECS {
+        for e in crate::test_cases::EXAMPLE_NODE_SPECS {
             let x = CustomEqWrapper(Scru64Generator::parse(e.node_spec).unwrap());
             serde_test::assert_tokens(&x, &[Token::Str(e.node_spec)]);
             serde_test::assert_de_tokens(&x, &[Token::Bytes(e.node_spec.as_bytes())]);
         }
     }
-}
-
-#[cfg(test)]
-mod test_cases {
-    #[derive(Debug)]
-    pub struct PreparedCase<'a> {
-        pub node_spec: &'a str,
-        pub node_id: u32,
-        pub node_id_size: u8,
-        pub node_prev: u64,
-    }
-
-    pub const NODE_SPECS: &[PreparedCase] = &[
-        PreparedCase {
-            node_spec: "0/1",
-            node_id: 0,
-            node_id_size: 1,
-            node_prev: 0x0,
-        },
-        PreparedCase {
-            node_spec: "1/1",
-            node_id: 1,
-            node_id_size: 1,
-            node_prev: 0x800000,
-        },
-        PreparedCase {
-            node_spec: "0/8",
-            node_id: 0,
-            node_id_size: 8,
-            node_prev: 0x0,
-        },
-        PreparedCase {
-            node_spec: "42/8",
-            node_id: 42,
-            node_id_size: 8,
-            node_prev: 0x2a0000,
-        },
-        PreparedCase {
-            node_spec: "255/8",
-            node_id: 255,
-            node_id_size: 8,
-            node_prev: 0xff0000,
-        },
-        PreparedCase {
-            node_spec: "0/16",
-            node_id: 0,
-            node_id_size: 16,
-            node_prev: 0x0,
-        },
-        PreparedCase {
-            node_spec: "334/16",
-            node_id: 334,
-            node_id_size: 16,
-            node_prev: 0x14e00,
-        },
-        PreparedCase {
-            node_spec: "65535/16",
-            node_id: 65535,
-            node_id_size: 16,
-            node_prev: 0xffff00,
-        },
-        PreparedCase {
-            node_spec: "0/23",
-            node_id: 0,
-            node_id_size: 23,
-            node_prev: 0x0,
-        },
-        PreparedCase {
-            node_spec: "123456/23",
-            node_id: 123456,
-            node_id_size: 23,
-            node_prev: 0x3c480,
-        },
-        PreparedCase {
-            node_spec: "8388607/23",
-            node_id: 8388607,
-            node_id_size: 23,
-            node_prev: 0xfffffe,
-        },
-        PreparedCase {
-            node_spec: "v0rbps7ay8ks/1",
-            node_id: 0,
-            node_id_size: 1,
-            node_prev: 0x38a9e683bb4425ec,
-        },
-        PreparedCase {
-            node_spec: "v0rbps7ay8ks/8",
-            node_id: 68,
-            node_id_size: 8,
-            node_prev: 0x38a9e683bb4425ec,
-        },
-        PreparedCase {
-            node_spec: "v0rbps7ay8ks/16",
-            node_id: 17445,
-            node_id_size: 16,
-            node_prev: 0x38a9e683bb4425ec,
-        },
-        PreparedCase {
-            node_spec: "v0rbps7ay8ks/23",
-            node_id: 2233078,
-            node_id_size: 23,
-            node_prev: 0x38a9e683bb4425ec,
-        },
-        PreparedCase {
-            node_spec: "z0jndjt42op2/1",
-            node_id: 1,
-            node_id_size: 1,
-            node_prev: 0x3ff596748ea77186,
-        },
-        PreparedCase {
-            node_spec: "z0jndjt42op2/8",
-            node_id: 167,
-            node_id_size: 8,
-            node_prev: 0x3ff596748ea77186,
-        },
-        PreparedCase {
-            node_spec: "z0jndjt42op2/16",
-            node_id: 42865,
-            node_id_size: 16,
-            node_prev: 0x3ff596748ea77186,
-        },
-        PreparedCase {
-            node_spec: "z0jndjt42op2/23",
-            node_id: 5486787,
-            node_id_size: 23,
-            node_prev: 0x3ff596748ea77186,
-        },
-        PreparedCase {
-            node_spec: "f2bembkd4zrb/1",
-            node_id: 1,
-            node_id_size: 1,
-            node_prev: 0x1b844eb5d1aebb07,
-        },
-        PreparedCase {
-            node_spec: "f2bembkd4zrb/8",
-            node_id: 174,
-            node_id_size: 8,
-            node_prev: 0x1b844eb5d1aebb07,
-        },
-        PreparedCase {
-            node_spec: "f2bembkd4zrb/16",
-            node_id: 44731,
-            node_id_size: 16,
-            node_prev: 0x1b844eb5d1aebb07,
-        },
-        PreparedCase {
-            node_spec: "f2bembkd4zrb/23",
-            node_id: 5725571,
-            node_id_size: 23,
-            node_prev: 0x1b844eb5d1aebb07,
-        },
-        PreparedCase {
-            node_spec: "mkg0fd5p76pp/1",
-            node_id: 0,
-            node_id_size: 1,
-            node_prev: 0x29391373ab449abd,
-        },
-        PreparedCase {
-            node_spec: "mkg0fd5p76pp/8",
-            node_id: 68,
-            node_id_size: 8,
-            node_prev: 0x29391373ab449abd,
-        },
-        PreparedCase {
-            node_spec: "mkg0fd5p76pp/16",
-            node_id: 17562,
-            node_id_size: 16,
-            node_prev: 0x29391373ab449abd,
-        },
-        PreparedCase {
-            node_spec: "mkg0fd5p76pp/23",
-            node_id: 2248030,
-            node_id_size: 23,
-            node_prev: 0x29391373ab449abd,
-        },
-    ];
 }
