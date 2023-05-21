@@ -1,16 +1,8 @@
 use std::{env, sync};
 
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell as OnceLock;
 
 use super::{Scru64Generator, Scru64Id};
-
-static GLOBAL_GENERATOR: Lazy<sync::Mutex<Scru64Generator>> = Lazy::new(|| {
-    let node_spec = env::var("SCRU64_NODE_SPEC")
-        .expect("scru64: could not read config from SCRU64_NODE_SPEC env var");
-    let g =
-        Scru64Generator::parse(&node_spec).expect("scru64: could not initialize global generator");
-    sync::Mutex::new(g)
-});
 
 /// A zero-sized type that forwards supported method calls to the process-wide global generator.
 ///
@@ -27,9 +19,17 @@ pub struct GlobalGenerator;
 
 impl GlobalGenerator {
     fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
-        GLOBAL_GENERATOR
-            .lock()
-            .expect("scru64: could not lock global generator")
+        static G: OnceLock<sync::Mutex<Scru64Generator>> = OnceLock::new();
+
+        G.get_or_init(|| {
+            let node_spec = env::var("SCRU64_NODE_SPEC")
+                .expect("scru64: could not read config from SCRU64_NODE_SPEC env var");
+            let g = Scru64Generator::parse(&node_spec)
+                .expect("scru64: could not initialize global generator");
+            sync::Mutex::new(g)
+        })
+        .lock()
+        .expect("scru64: could not lock global generator")
     }
 
     /// Calls [`Scru64Generator::generate`] of the global generator.
