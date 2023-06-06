@@ -1,7 +1,5 @@
 use std::{env, sync};
 
-use once_cell::sync::OnceCell as OnceLock;
-
 use super::{Scru64Generator, Scru64Id};
 
 /// A zero-sized type that forwards supported method calls to the process-wide global generator.
@@ -19,7 +17,7 @@ pub struct GlobalGenerator;
 
 impl GlobalGenerator {
     fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
-        static G: OnceLock<sync::Mutex<Scru64Generator>> = OnceLock::new();
+        static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
 
         G.get_or_init(|| {
             let node_spec = env::var("SCRU64_NODE_SPEC")

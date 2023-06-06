@@ -9,11 +9,10 @@ repository = "https://github.com/scru64/rust"
 
 [features]
 default = ["std"]
-std = ["fstr/std", "once_cell"]
+std = ["fstr/std"]
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }
-once_cell = { version = "1.17", optional = true }
 pcg32 = { version = "0.1", default-features = false }
 serde = { version = "1.0", default-features = false, optional = true }
 tokio = { version = "1.27", features = ["time"], optional = true }
