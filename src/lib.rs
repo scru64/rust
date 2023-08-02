@@ -51,7 +51,7 @@
 pub mod generator;
 mod identifier;
 
-pub use identifier::{ConversionError, Scru64Id};
+pub use identifier::{ConversionError, RangeError, Scru64Id};
 
 #[cfg(feature = "std")]
 pub use shortcut::{new, new_string};

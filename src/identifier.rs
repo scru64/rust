@@ -60,7 +60,7 @@ impl Scru64Id {
     pub const fn const_from_u64(value: u64) -> Self {
         match Self::try_from_u64(value) {
             Ok(t) => t,
-            Err(_) => panic!("out of valid integer range"),
+            Err(_) => panic!("could not convert integer to SCRU64 ID: out of range"),
         }
     }
 
@@ -69,11 +69,11 @@ impl Scru64Id {
     /// # Errors
     ///
     /// Returns `Err` if the argument is out of the valid value range.
-    const fn try_from_u64(value: u64) -> Result<Self, ConversionError> {
+    const fn try_from_u64(value: u64) -> Result<Self, RangeError> {
         if value <= Self::MAX.0 {
             Ok(Self(value))
         } else {
-            Err(ConversionError::OutOfRange)
+            Err(RangeError::invalid_u64(value))
         }
     }
 
@@ -101,6 +101,8 @@ impl Scru64Id {
             buffer[i] = DIGITS[rem as usize];
             n = quo;
         }
+        debug_assert!(n == 0);
+
         // SAFETY: ok because buffer consists of ASCII code points
         debug_assert!(str::from_utf8(&buffer).is_ok());
         unsafe { FStr::from_inner_unchecked(buffer) }
@@ -138,7 +140,10 @@ impl Scru64Id {
                 n = n * 36 + e as u64;
                 i += 1;
             }
-            Self::try_from_u64(n)
+            match Self::try_from_u64(n) {
+                Ok(t) => Ok(t),
+                Err(_) => unreachable!(),
+            }
         }
     }
 
@@ -171,7 +176,7 @@ impl From<Scru64Id> for u64 {
 }
 
 impl TryFrom<u64> for Scru64Id {
-    type Error = ConversionError;
+    type Error = RangeError;
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         Self::try_from_u64(value)
@@ -185,11 +190,11 @@ impl From<Scru64Id> for i64 {
 }
 
 impl TryFrom<i64> for Scru64Id {
-    type Error = ConversionError;
+    type Error = RangeError;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         // cast negative numbers to so large numbers that try_from_u64 rejects
-        Self::try_from(value as u64)
+        Self::try_from(value as u64).map_err(|_| RangeError::invalid_i64(value))
     }
 }
 
@@ -207,13 +212,46 @@ impl str::FromStr for Scru64Id {
     }
 }
 
+/// An error converting an integer into a SCRU64 ID.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RangeError {
+    kind: RangeErrorKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum RangeErrorKind {
+    U64(u64),
+    I64(i64),
+}
+
+impl RangeError {
+    const fn invalid_u64(n: u64) -> Self {
+        Self {
+            kind: RangeErrorKind::U64(n),
+        }
+    }
+
+    const fn invalid_i64(n: i64) -> Self {
+        Self {
+            kind: RangeErrorKind::I64(n),
+        }
+    }
+}
+
+impl fmt::Display for RangeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "could not convert integer to SCRU64 ID: ")?;
+        match self.kind {
+            RangeErrorKind::U64(n) => write!(f, "out of range: {:#x}", n),
+            RangeErrorKind::I64(n) => write!(f, "out of range: {}", n),
+        }
+    }
+}
+
 /// An error converting a value into SCRU64 ID.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ConversionError {
-    /// Out of valid integer range.
-    OutOfRange,
-
     /// Invalid length of string.
     InvalidLength,
 
@@ -225,7 +263,6 @@ impl fmt::Display for ConversionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("could not convert to SCRU64 ID: ")?;
         match self {
-            Self::OutOfRange => f.write_str("out of valid integer range"),
             Self::InvalidLength => f.write_str("invalid length of string"),
             Self::InvalidDigit => f.write_str("invalid digit char found"),
         }
@@ -235,7 +272,7 @@ impl fmt::Display for ConversionError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{ConversionError, Scru64Id};
+    use super::{ConversionError, RangeError, Scru64Id};
 
     impl TryFrom<String> for Scru64Id {
         type Error = ConversionError;
@@ -250,6 +287,8 @@ mod std_ext {
             object.encode().into()
         }
     }
+
+    impl std::error::Error for RangeError {}
 
     impl std::error::Error for ConversionError {}
 }
