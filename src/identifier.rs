@@ -89,7 +89,7 @@ impl Scru64Id {
     /// let y = x.encode();
     /// assert_eq!(y, "0u2r87q2rol5");
     /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
-    /// # Ok::<(), scru64::ConversionError>(())
+    /// # Ok::<(), scru64::ParseError>(())
     /// ```
     pub const fn encode(self) -> FStr<12> {
         let mut buffer = [0u8; 12];
@@ -116,7 +116,7 @@ impl Scru64Id {
     pub const fn const_from_str(value: &str) -> Self {
         match Self::try_from_str(value) {
             Ok(t) => t,
-            Err(_) => panic!("invalid string representation"),
+            Err(_) => panic!("could not parse SCRU64 ID string"),
         }
     }
 
@@ -125,9 +125,9 @@ impl Scru64Id {
     /// # Errors
     ///
     /// Returns `Err` if the argument is not a valid string representation.
-    const fn try_from_str(value: &str) -> Result<Self, ConversionError> {
+    const fn try_from_str(value: &str) -> Result<Self, ParseError> {
         if value.len() != 12 {
-            Err(ConversionError::InvalidLength)
+            Err(ParseError::InvalidLength)
         } else {
             let buffer = value.as_bytes();
             let mut n = 0u64;
@@ -135,7 +135,7 @@ impl Scru64Id {
             while i < value.len() {
                 let e = DECODE_MAP[buffer[i] as usize];
                 if e == 0xff {
-                    return Err(ConversionError::InvalidDigit);
+                    return Err(ParseError::InvalidDigit);
                 }
                 n = n * 36 + e as u64;
                 i += 1;
@@ -205,7 +205,7 @@ impl fmt::Display for Scru64Id {
 }
 
 impl str::FromStr for Scru64Id {
-    type Err = ConversionError;
+    type Err = ParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::try_from_str(value)
@@ -248,10 +248,10 @@ impl fmt::Display for RangeError {
     }
 }
 
-/// An error converting a value into SCRU64 ID.
+/// An error parsing an invalid string representation of SCRU64 ID.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub enum ConversionError {
+pub enum ParseError {
     /// Invalid length of string.
     InvalidLength,
 
@@ -259,9 +259,9 @@ pub enum ConversionError {
     InvalidDigit,
 }
 
-impl fmt::Display for ConversionError {
+impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("could not convert to SCRU64 ID: ")?;
+        f.write_str("could not parse SCRU64 ID string: ")?;
         match self {
             Self::InvalidLength => f.write_str("invalid length of string"),
             Self::InvalidDigit => f.write_str("invalid digit char found"),
@@ -272,10 +272,10 @@ impl fmt::Display for ConversionError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{ConversionError, RangeError, Scru64Id};
+    use super::{ParseError, RangeError, Scru64Id};
 
     impl TryFrom<String> for Scru64Id {
-        type Error = ConversionError;
+        type Error = ParseError;
 
         fn try_from(value: String) -> Result<Self, Self::Error> {
             value.parse()
@@ -290,7 +290,7 @@ mod std_ext {
 
     impl std::error::Error for RangeError {}
 
-    impl std::error::Error for ConversionError {}
+    impl std::error::Error for ParseError {}
 }
 
 #[cfg(test)]
