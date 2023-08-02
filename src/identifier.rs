@@ -116,7 +116,7 @@ impl Scru64Id {
     pub const fn const_from_str(value: &str) -> Self {
         match Self::try_from_str(value) {
             Ok(t) => t,
-            Err(_) => panic!("could not parse SCRU64 ID string"),
+            Err(_) => panic!("could not parse string as SCRU64 ID"),
         }
     }
 
@@ -127,7 +127,7 @@ impl Scru64Id {
     /// Returns `Err` if the argument is not a valid string representation.
     const fn try_from_str(value: &str) -> Result<Self, ParseError> {
         if value.len() != 12 {
-            Err(ParseError::InvalidLength)
+            Err(ParseError::invalid_length(value.len()))
         } else {
             let buffer = value.as_bytes();
             let mut n = 0u64;
@@ -135,7 +135,7 @@ impl Scru64Id {
             while i < value.len() {
                 let e = DECODE_MAP[buffer[i] as usize];
                 if e == 0xff {
-                    return Err(ParseError::InvalidDigit);
+                    return Err(ParseError::invalid_digit(value, i));
                 }
                 n = n * 36 + e as u64;
                 i += 1;
@@ -250,21 +250,73 @@ impl fmt::Display for RangeError {
 
 /// An error parsing an invalid string representation of SCRU64 ID.
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum ParseError {
-    /// Invalid length of string.
-    InvalidLength,
+pub struct ParseError {
+    kind: ParseErrorKind,
+}
 
-    /// Invalid digit char found.
-    InvalidDigit,
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ParseErrorKind {
+    InvalidLength {
+        n_bytes: usize,
+    },
+    InvalidDigit {
+        /// Holds the invalid character as a UTF-8 byte array to work in the const context.
+        utf8_char: [u8; 4],
+        position: usize,
+    },
+}
+
+impl ParseError {
+    /// Creates an `InvalidLength` variant from the actual length.
+    const fn invalid_length(n_bytes: usize) -> Self {
+        Self {
+            kind: ParseErrorKind::InvalidLength { n_bytes },
+        }
+    }
+
+    /// Creates an `InvalidDigit` variant from the entire string and the position of invalid digit.
+    const fn invalid_digit(src: &str, position: usize) -> Self {
+        const fn is_char_boundary(utf8_bytes: &[u8], index: usize) -> bool {
+            match index {
+                0 => true,
+                i if i < utf8_bytes.len() => (utf8_bytes[i] as i8) >= -64,
+                _ => index == utf8_bytes.len(),
+            }
+        }
+
+        let bs = src.as_bytes();
+        assert!(is_char_boundary(bs, position));
+        let mut utf8_char = [bs[position], 0, 0, 0];
+
+        let mut i = 1;
+        while !is_char_boundary(bs, position + i) {
+            utf8_char[i] = bs[position + i];
+            i += 1;
+        }
+
+        Self {
+            kind: ParseErrorKind::InvalidDigit {
+                utf8_char,
+                position,
+            },
+        }
+    }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("could not parse SCRU64 ID string: ")?;
-        match self {
-            Self::InvalidLength => f.write_str("invalid length of string"),
-            Self::InvalidDigit => f.write_str("invalid digit char found"),
+        write!(f, "could not parse string as SCRU64 ID: ")?;
+        match self.kind {
+            ParseErrorKind::InvalidLength { n_bytes } => {
+                write!(f, "invalid length: {} bytes (expected 12)", n_bytes)
+            }
+            ParseErrorKind::InvalidDigit {
+                utf8_char,
+                position,
+            } => {
+                let chr = str::from_utf8(&utf8_char).unwrap().chars().next().unwrap();
+                write!(f, "invalid digit '{}' at {}", chr.escape_debug(), position)
+            }
         }
     }
 }
