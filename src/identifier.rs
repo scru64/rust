@@ -357,7 +357,7 @@ mod tests {
     fn eq() {
         #[cfg(feature = "std")]
         let hash = {
-            use core::hash::{BuildHasher, Hash, Hasher};
+            use std::hash::{BuildHasher, Hash, Hasher};
             let s = std::collections::hash_map::RandomState::new();
             move |value: Scru64Id| {
                 let mut hasher = s.build_hasher();
@@ -386,6 +386,8 @@ mod tests {
 
             #[cfg(feature = "std")]
             {
+                assert_eq!(curr.to_string(), twin.to_string());
+                assert_ne!(curr.to_string(), prev.to_string());
                 assert_eq!(hash(curr), hash(twin));
                 assert_ne!(hash(curr), hash(prev));
             }
@@ -400,8 +402,9 @@ mod tests {
         let mut cases = EXAMPLE_IDS.to_vec();
         cases.sort_by_key(|e| e.num);
 
-        let mut prev = Scru64Id::const_from_u64(cases[0].num);
-        for e in cases.iter().skip(1) {
+        let mut iter = cases.iter();
+        let mut prev = Scru64Id::const_from_u64(iter.next().unwrap().num);
+        while let Some(e) = iter.next() {
             let curr = Scru64Id::const_from_u64(e.num);
 
             assert!(prev < curr);
@@ -409,6 +412,8 @@ mod tests {
 
             assert!(curr > prev);
             assert!(curr >= prev);
+
+            assert!(prev.to_u64() < curr.to_u64());
 
             prev = curr;
         }
