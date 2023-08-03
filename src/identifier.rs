@@ -47,11 +47,6 @@ impl Scru64Id {
     /// The maximum valid value (i.e., `zzzzzzzzzzzz`).
     pub const MAX: Self = Scru64Id(36u64.pow(12) - 1);
 
-    /// Returns the integer representation.
-    pub const fn to_u64(self) -> u64 {
-        self.0
-    }
-
     /// Creates a value from a 64-bit integer in the `const` context.
     ///
     /// # Panics
@@ -77,35 +72,30 @@ impl Scru64Id {
         }
     }
 
-    /// Returns the 12-digit canonical string representation stored in a stack-allocated
-    /// string-like type that can be handled like [`String`] through common traits.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use scru64::Scru64Id;
-    ///
-    /// let x = "0u2r87q2rol5".parse::<Scru64Id>()?;
-    /// let y = x.encode();
-    /// assert_eq!(y, "0u2r87q2rol5");
-    /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
-    /// # Ok::<(), scru64::ParseError>(())
-    /// ```
-    pub const fn encode(self) -> FStr<12> {
-        let mut buffer = [0u8; 12];
-        let mut n = self.0;
-        let mut i = buffer.len();
-        while i > 0 {
-            i -= 1;
-            let (quo, rem) = (n / 36, n % 36);
-            buffer[i] = DIGITS[rem as usize];
-            n = quo;
-        }
-        debug_assert!(n == 0);
+    /// Returns the integer representation.
+    pub const fn to_u64(self) -> u64 {
+        self.0
+    }
 
-        // SAFETY: ok because buffer consists of ASCII code points
-        debug_assert!(str::from_utf8(&buffer).is_ok());
-        unsafe { FStr::from_inner_unchecked(buffer) }
+    /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any argument is out of the valid value range.
+    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
+        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
+        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
+        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
+    }
+
+    /// Returns the `timestamp` field value.
+    pub const fn timestamp(self) -> u64 {
+        self.0 >> NODE_CTR_SIZE
+    }
+
+    /// Returns the `node_id` and `counter` field values combined as a single integer.
+    pub const fn node_ctr(self) -> u32 {
+        self.0 as u32 & MAX_NODE_CTR
     }
 
     /// Creates a value from a 12-digit string representation in the `const` context.
@@ -147,31 +137,35 @@ impl Scru64Id {
         }
     }
 
-    /// Returns the `timestamp` field value.
-    pub const fn timestamp(self) -> u64 {
-        self.0 >> NODE_CTR_SIZE
-    }
-
-    /// Returns the `node_id` and `counter` field values combined as a single integer.
-    pub const fn node_ctr(self) -> u32 {
-        self.0 as u32 & MAX_NODE_CTR
-    }
-
-    /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
+    /// Returns the 12-digit canonical string representation stored in a stack-allocated
+    /// string-like type that can be handled like [`String`] through common traits.
     ///
-    /// # Panics
+    /// # Examples
     ///
-    /// Panics if any argument is out of the valid value range.
-    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
-        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
-        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
-        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
-    }
-}
+    /// ```rust
+    /// use scru64::Scru64Id;
+    ///
+    /// let x = "0u2r87q2rol5".parse::<Scru64Id>()?;
+    /// let y = x.encode();
+    /// assert_eq!(y, "0u2r87q2rol5");
+    /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
+    /// # Ok::<(), scru64::ParseError>(())
+    /// ```
+    pub const fn encode(self) -> FStr<12> {
+        let mut buffer = [0u8; 12];
+        let mut n = self.0;
+        let mut i = buffer.len();
+        while i > 0 {
+            i -= 1;
+            let (quo, rem) = (n / 36, n % 36);
+            buffer[i] = DIGITS[rem as usize];
+            n = quo;
+        }
+        debug_assert!(n == 0);
 
-impl From<Scru64Id> for u64 {
-    fn from(value: Scru64Id) -> Self {
-        value.to_u64()
+        // SAFETY: ok because buffer consists of ASCII code points
+        debug_assert!(str::from_utf8(&buffer).is_ok());
+        unsafe { FStr::from_inner_unchecked(buffer) }
     }
 }
 
@@ -183,9 +177,9 @@ impl TryFrom<u64> for Scru64Id {
     }
 }
 
-impl From<Scru64Id> for i64 {
+impl From<Scru64Id> for u64 {
     fn from(value: Scru64Id) -> Self {
-        value.to_u64() as i64
+        value.to_u64()
     }
 }
 
@@ -198,9 +192,9 @@ impl TryFrom<i64> for Scru64Id {
     }
 }
 
-impl fmt::Display for Scru64Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self.encode().as_str(), f)
+impl From<Scru64Id> for i64 {
+    fn from(value: Scru64Id) -> Self {
+        value.to_u64() as i64
     }
 }
 
@@ -209,6 +203,12 @@ impl str::FromStr for Scru64Id {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::try_from_str(value)
+    }
+}
+
+impl fmt::Display for Scru64Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.encode().as_str(), f)
     }
 }
 
