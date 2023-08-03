@@ -55,7 +55,7 @@ impl Scru64Id {
     pub const fn const_from_u64(value: u64) -> Self {
         match Self::try_from_u64(value) {
             Ok(t) => t,
-            Err(_) => panic!("could not convert integer to SCRU64 ID: out of range"),
+            Err(_) => panic!("could not convert integer to SCRU64 ID: `u64` out of range"),
         }
     }
 
@@ -225,12 +225,14 @@ enum RangeErrorKind {
 }
 
 impl RangeError {
+    /// Creates a  "`u64` out of range" error from the invalid integer.
     const fn invalid_u64(n: u64) -> Self {
         Self {
             kind: RangeErrorKind::U64(n),
         }
     }
 
+    /// Creates an  "`i64` out of range" error from the invalid integer.
     const fn invalid_i64(n: i64) -> Self {
         Self {
             kind: RangeErrorKind::I64(n),
@@ -242,8 +244,8 @@ impl fmt::Display for RangeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "could not convert integer to SCRU64 ID: ")?;
         match self.kind {
-            RangeErrorKind::U64(n) => write!(f, "out of range: {:#x}", n),
-            RangeErrorKind::I64(n) => write!(f, "out of range: {}", n),
+            RangeErrorKind::U64(n) => write!(f, "`u64` out of range: {:#x}", n),
+            RangeErrorKind::I64(n) => write!(f, "`i64` out of range: {}", n),
         }
     }
 }
