@@ -258,10 +258,10 @@ pub struct ParseError {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ParseErrorKind {
-    InvalidLength {
+    Length {
         n_bytes: usize,
     },
-    InvalidDigit {
+    Digit {
         /// Holds the invalid character as a UTF-8 byte array to work in the const context.
         utf8_char: [u8; 4],
         position: usize,
@@ -269,14 +269,14 @@ enum ParseErrorKind {
 }
 
 impl ParseError {
-    /// Creates an `InvalidLength` variant from the actual length.
+    /// Creates an "invalid length" error from the actual length.
     const fn invalid_length(n_bytes: usize) -> Self {
         Self {
-            kind: ParseErrorKind::InvalidLength { n_bytes },
+            kind: ParseErrorKind::Length { n_bytes },
         }
     }
 
-    /// Creates an `InvalidDigit` variant from the entire string and the position of invalid digit.
+    /// Creates an "invalid digit" error from the entire string and the position of invalid digit.
     const fn invalid_digit(src: &str, position: usize) -> Self {
         const fn is_char_boundary(utf8_bytes: &[u8], index: usize) -> bool {
             match index {
@@ -297,7 +297,7 @@ impl ParseError {
         }
 
         Self {
-            kind: ParseErrorKind::InvalidDigit {
+            kind: ParseErrorKind::Digit {
                 utf8_char,
                 position,
             },
@@ -309,10 +309,10 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "could not parse string as SCRU64 ID: ")?;
         match self.kind {
-            ParseErrorKind::InvalidLength { n_bytes } => {
+            ParseErrorKind::Length { n_bytes } => {
                 write!(f, "invalid length: {} bytes (expected 12)", n_bytes)
             }
-            ParseErrorKind::InvalidDigit {
+            ParseErrorKind::Digit {
                 utf8_char,
                 position,
             } => {
@@ -528,7 +528,7 @@ mod serde_support {
         }
 
         fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
-            value.parse().map_err(de::Error::custom)
+            Self::Value::try_from_str(value).map_err(de::Error::custom)
         }
 
         fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
