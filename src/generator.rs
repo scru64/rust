@@ -4,11 +4,10 @@
 use core as std;
 use std::fmt;
 
-use pcg32::Pcg32;
-
 use crate::{Scru64Id, NODE_CTR_SIZE};
 
 pub mod counter_mode;
+use counter_mode::{InitCounter, InitCounterContext, PartialRandom};
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
@@ -39,10 +38,10 @@ pub use global_gen::GlobalGenerator;
 /// [`generate_or_abort_core`]: Scru64Generator::generate_or_abort_core
 /// [`generate_or_reset_core`]: Scru64Generator::generate_or_reset_core
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Scru64Generator {
+pub struct Scru64Generator<C = PartialRandom> {
     prev: Scru64Id,
     counter_size: u8,
-    rng: Pcg32,
+    counter_mode: C,
 }
 
 impl Scru64Generator {
@@ -73,12 +72,10 @@ impl Scru64Generator {
     /// Panics if `node_id_size` is zero or greater than 23.
     pub fn restore(node_prev: Scru64Id, node_id_size: u8) -> Self {
         verify_node_id_size(node_id_size).unwrap_or_else(|err| panic!("{err}"));
-        let counter_size = NODE_CTR_SIZE - node_id_size;
-        let seed = &counter_size as *const u8; // use local var address as seed
         Self {
             prev: node_prev,
-            counter_size,
-            rng: Pcg32::new(node_prev.to_u64(), seed as u64),
+            counter_size: NODE_CTR_SIZE - node_id_size,
+            counter_mode: Default::default(),
         }
     }
 
@@ -118,7 +115,9 @@ impl Scru64Generator {
             Ok(Self::new(node_id, node_id_size))
         }
     }
+}
 
+impl<C> Scru64Generator<C> {
     /// Returns the immediately preceding ID that the generator generated.
     pub const fn node_prev(&self) -> Option<Scru64Id> {
         if self.prev.timestamp() > 0 {
@@ -147,18 +146,21 @@ impl Scru64Generator {
             write!(buffer, "{}/{}", self.node_id(), self.node_id_size())
         }
     }
+}
 
+impl<C: InitCounter> Scru64Generator<C> {
     /// Calculates the combined `node_ctr` field value for the next `timestamp` tick.
-    fn init_node_ctr(&mut self) -> u32 {
-        // initialize counter at `counter_size - 1`-bit random number
-        const OVERFLOW_GUARD_SIZE: u8 = 1;
-        let counter = if OVERFLOW_GUARD_SIZE < self.counter_size {
-            self.rng.gen() >> (32 + OVERFLOW_GUARD_SIZE - self.counter_size)
-        } else {
-            0
-        };
-
-        (self.node_id() << self.counter_size) | counter
+    fn init_node_ctr(&mut self, timestamp: u64) -> u32 {
+        let node_id = self.node_id();
+        let counter = self.counter_mode.init_counter(
+            self.counter_size,
+            &InitCounterContext { timestamp, node_id },
+        );
+        assert!(
+            counter < (1 << self.counter_size),
+            "illegal `InitCounter` implementation"
+        );
+        (node_id << self.counter_size) | counter
     }
 
     /// Generates a new SCRU64 ID object from a Unix timestamp in milliseconds, or resets the
@@ -177,7 +179,8 @@ impl Scru64Generator {
             value
         } else {
             // reset state and resume
-            self.prev = Scru64Id::from_parts(unix_ts_ms >> 8, self.init_node_ctr());
+            let timestamp = unix_ts_ms >> 8;
+            self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr(timestamp));
             self.prev
         }
     }
@@ -208,7 +211,7 @@ impl Scru64Generator {
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
-            self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr());
+            self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr(timestamp));
         } else if timestamp + allowance >= prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
@@ -217,7 +220,10 @@ impl Scru64Generator {
                 self.prev = Scru64Id::from_parts(prev_timestamp, prev_node_ctr + 1);
             } else {
                 // increment timestamp at counter overflow
-                self.prev = Scru64Id::from_parts(prev_timestamp + 1, self.init_node_ctr());
+                self.prev = Scru64Id::from_parts(
+                    prev_timestamp + 1,
+                    self.init_node_ctr(prev_timestamp + 1),
+                );
             }
         } else {
             // abort if clock went backwards to unbearable extent
@@ -230,7 +236,7 @@ impl Scru64Generator {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{Scru64Generator, Scru64Id};
+    use super::{InitCounter, Scru64Generator, Scru64Id};
 
     /// Returns the current Unix timestamp in milliseconds.
     fn unix_ts_ms() -> u64 {
@@ -241,7 +247,7 @@ mod std_ext {
             .as_millis() as u64
     }
 
-    impl Scru64Generator {
+    impl<C> Scru64Generator<C> {
         /// Returns the node spec string that revives the current generator state through
         /// [`Scru64Generator::parse`].
         pub fn node_spec(&self) -> String {
@@ -250,7 +256,9 @@ mod std_ext {
                 .expect("could not write `node_spec` into `String`");
             buffer
         }
+    }
 
+    impl<C: InitCounter> Scru64Generator<C> {
         /// Generates a new SCRU64 ID object from the current `timestamp`, or returns `None` upon
         /// significant timestamp rollback.
         ///
