@@ -1,7 +1,5 @@
 //! Types to customize the counter behavior of [`Scru64Generator`].
 
-use pcg32::Pcg32;
-
 use crate::NODE_CTR_SIZE;
 
 #[cfg(doc)]
@@ -47,11 +45,11 @@ impl InitCounter for ZeroStarting {
 /// some specified leading bits are set to zero to reserve space as the counter overflow guard.
 ///
 /// Note that the random number generator employed is not cryptographically strong nor is securely
-/// seeded.
+/// seeded. This mode does not pay for security because a small random number is insecure anyway.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PartialRandom {
-    rng: Option<Pcg32>,
     overflow_guard_size: u8,
+    rng: u64,
 }
 
 impl Default for PartialRandom {
@@ -66,46 +64,39 @@ impl PartialRandom {
     pub const fn new(overflow_guard_size: u8) -> Self {
         assert!(overflow_guard_size < NODE_CTR_SIZE);
         Self {
-            rng: None,
             overflow_guard_size,
+            rng: 0, // zero indicates uninitialized state
         }
     }
 
     /// Initializes the random number generator.
     #[cold]
-    fn init_rng(&mut self, counter_size: u8, context: &InitCounterContext) {
-        let mut seed = [0u64; 2];
+    fn new_rng(&self, counter_size: u8, context: &InitCounterContext) -> u64 {
+        // use context and variable addresses as seed
+        #[cfg(feature = "std")]
+        let addr = Box::into_raw(Box::new(42)) as u64;
+        #[cfg(not(feature = "std"))]
+        let addr = (self as *const Self) as u64;
 
-        {
-            // use context and variable addresses as seed
-            seed[0] =
-                (context.timestamp << NODE_CTR_SIZE) | ((context.node_id as u64) << counter_size);
-
-            #[cfg(feature = "std")]
-            let mut x = Box::into_raw(Box::new(42)) as u64;
-            #[cfg(not(feature = "std"))]
-            let mut x = (self as *mut Self) as u64;
-
-            // scramble it with xorshift64* (Vigna 2016)
-            x ^= x >> 12;
-            x ^= x << 25;
-            x ^= x >> 27;
-            seed[1] = x.wrapping_mul(2685821657736338717);
-        }
-
-        self.rng = Some(Pcg32::new(seed[0], seed[1]));
+        addr ^ ((context.timestamp << NODE_CTR_SIZE) | ((context.node_id as u64) << counter_size))
     }
 }
 
 impl InitCounter for PartialRandom {
     fn init_counter(&mut self, counter_size: u8, context: &InitCounterContext) -> u32 {
         debug_assert!(counter_size < NODE_CTR_SIZE);
-        if self.rng.is_none() {
-            self.init_rng(counter_size, context);
+        if self.rng == 0 {
+            self.rng = self.new_rng(counter_size, context);
         }
 
         if self.overflow_guard_size < counter_size {
-            self.rng.as_mut().unwrap().gen() >> (32 + self.overflow_guard_size - counter_size)
+            let shift = 64 + self.overflow_guard_size - counter_size;
+
+            // xorshift64* (Vigna 2016)
+            self.rng ^= self.rng >> 12;
+            self.rng ^= self.rng << 25;
+            self.rng ^= self.rng >> 27;
+            (self.rng.wrapping_mul(2685821657736338717) >> shift) as u32
         } else {
             0
         }
