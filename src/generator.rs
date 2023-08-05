@@ -8,6 +8,8 @@ use pcg32::Pcg32;
 
 use crate::{Scru64Id, NODE_CTR_SIZE};
 
+pub mod counter_mode;
+
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod global_gen;
