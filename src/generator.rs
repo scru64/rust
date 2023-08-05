@@ -29,11 +29,10 @@ pub use global_gen::GlobalGenerator;
 /// | [`generate_or_reset_core`] | Argument  | Resets generator    |
 ///
 /// All of these methods return monotonically increasing IDs unless a timestamp provided is
-/// significantly (by default, approx. 10 seconds or more) smaller than the one embedded in the
-/// immediately preceding ID. If such a significant clock rollback is detected, the `generate`
-/// (or_abort) method aborts and returns `None`, while the `or_reset` variants reset the generator
-/// and return a new ID based on the given timestamp. The `core` functions offer low-level
-/// primitives.
+/// significantly (by default, approx. 10 seconds) smaller than the one embedded in the immediately
+/// preceding ID. If such a significant clock rollback is detected, the `generate` (or_abort)
+/// method aborts and returns `None`, while the `or_reset` variants reset the generator and return
+/// a new ID based on the given timestamp. The `core` functions offer low-level primitives.
 ///
 /// [`generate`]: Scru64Generator::generate
 /// [`generate_or_reset`]: Scru64Generator::generate_or_reset
@@ -210,7 +209,7 @@ impl Scru64Generator {
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
             self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr());
-        } else if timestamp + allowance > prev_timestamp {
+        } else if timestamp + allowance >= prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
             let counter_mask = (1u32 << self.counter_size) - 1;
@@ -440,7 +439,7 @@ mod tests {
             ts += ALLOWANCE * 16;
             prev = g.generate_or_reset_core(ts, ALLOWANCE);
             for _ in 0..N_LOOPS {
-                ts -= ALLOWANCE;
+                ts -= ALLOWANCE + 0x100;
                 let curr = g.generate_or_reset_core(ts, ALLOWANCE);
                 assert!(prev > curr);
                 assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
@@ -490,7 +489,7 @@ mod tests {
             // abort with significantly decreasing timestamps
             ts += ALLOWANCE * 16;
             g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
-            ts -= ALLOWANCE;
+            ts -= ALLOWANCE + 0x100;
             for _ in 0..N_LOOPS {
                 ts -= 16;
                 assert!(g.generate_or_abort_core(ts, ALLOWANCE).is_none());
