@@ -6,6 +6,9 @@ use std::fmt;
 
 use crate::{Scru64Id, NODE_CTR_SIZE};
 
+pub mod node_spec;
+use node_spec::NodeSpec;
+
 pub mod counter_mode;
 use counter_mode::{InitCounter, InitCounterContext, PartialRandom};
 
@@ -45,7 +48,7 @@ pub struct Scru64Generator<C = PartialRandom> {
 }
 
 impl Scru64Generator {
-    /// Creates a new generator with a given node configuration.
+    /// Creates a new generator with the given node configuration.
     ///
     /// The `node_id` must fit in `node_id_size` bits, where `node_id_size` ranges from 1 to 23,
     /// inclusive.
@@ -149,6 +152,15 @@ impl<C> Scru64Generator<C> {
 }
 
 impl<C: InitCounter> Scru64Generator<C> {
+    /// Creates a new generator with the given node configuration and counter initialization mode.
+    pub const fn with_counter_mode(node_spec: NodeSpec, counter_mode: C) -> Self {
+        Self {
+            prev: node_spec.node_prev_raw(),
+            counter_size: NODE_CTR_SIZE - node_spec.node_id_size(),
+            counter_mode,
+        }
+    }
+
     /// Calculates the combined `node_ctr` field value for the next `timestamp` tick.
     fn init_node_ctr(&mut self, timestamp: u64) -> u32 {
         let node_id = self.node_id();
