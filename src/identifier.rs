@@ -1,6 +1,6 @@
 #[cfg(not(feature = "std"))]
 use core as std;
-use std::{fmt, str};
+use std::{any, fmt, str};
 
 use fstr::FStr;
 
@@ -64,11 +64,11 @@ impl Scru64Id {
     /// # Errors
     ///
     /// Returns `Err` if the argument is out of the valid value range.
-    const fn try_from_u64(value: u64) -> Result<Self, RangeError> {
+    const fn try_from_u64(value: u64) -> Result<Self, RangeError<u64>> {
         if value <= Self::MAX.0 {
             Ok(Self(value))
         } else {
-            Err(RangeError::invalid_u64(value))
+            Err(RangeError { value })
         }
     }
 
@@ -170,7 +170,7 @@ impl Scru64Id {
 }
 
 impl TryFrom<u64> for Scru64Id {
-    type Error = RangeError;
+    type Error = RangeError<u64>;
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         Self::try_from_u64(value)
@@ -184,11 +184,11 @@ impl From<Scru64Id> for u64 {
 }
 
 impl TryFrom<i64> for Scru64Id {
-    type Error = RangeError;
+    type Error = RangeError<i64>;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         // cast negative numbers to so large numbers that try_from_u64 rejects
-        Self::try_from(value as u64).map_err(|_| RangeError::invalid_i64(value))
+        Self::try_from(value as u64).map_err(|_| RangeError { value })
     }
 }
 
@@ -214,39 +214,18 @@ impl fmt::Display for Scru64Id {
 
 /// An error converting an integer into a SCRU64 ID.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RangeError {
-    kind: RangeErrorKind,
+pub struct RangeError<T> {
+    value: T,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum RangeErrorKind {
-    U64(u64),
-    I64(i64),
-}
-
-impl RangeError {
-    /// Creates a  "`u64` out of range" error from the invalid integer.
-    const fn invalid_u64(n: u64) -> Self {
-        Self {
-            kind: RangeErrorKind::U64(n),
-        }
-    }
-
-    /// Creates an  "`i64` out of range" error from the invalid integer.
-    const fn invalid_i64(n: i64) -> Self {
-        Self {
-            kind: RangeErrorKind::I64(n),
-        }
-    }
-}
-
-impl fmt::Display for RangeError {
+impl<T: fmt::Display> fmt::Display for RangeError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "could not convert integer to SCRU64 ID: ")?;
-        match self.kind {
-            RangeErrorKind::U64(n) => write!(f, "`u64` out of range: {:#x}", n),
-            RangeErrorKind::I64(n) => write!(f, "`i64` out of range: {}", n),
-        }
+        write!(
+            f,
+            "could not convert integer to SCRU64 ID: `{}` out of range: {}",
+            any::type_name::<T>(),
+            self.value
+        )
     }
 }
 
@@ -328,6 +307,8 @@ impl fmt::Display for ParseError {
 mod std_ext {
     use super::{ParseError, RangeError, Scru64Id};
 
+    use std::{error, fmt};
+
     impl TryFrom<String> for Scru64Id {
         type Error = ParseError;
 
@@ -342,9 +323,9 @@ mod std_ext {
         }
     }
 
-    impl std::error::Error for RangeError {}
+    impl<T: fmt::Debug + fmt::Display> error::Error for RangeError<T> {}
 
-    impl std::error::Error for ParseError {}
+    impl error::Error for ParseError {}
 }
 
 #[cfg(test)]
