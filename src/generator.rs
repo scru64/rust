@@ -2,8 +2,8 @@
 
 use crate::{Scru64Id, NODE_CTR_SIZE};
 
-pub mod node_spec;
-use node_spec::NodeSpec;
+mod node_spec;
+pub use node_spec::{NodeSpec, NodeSpecError, NodeSpecParseError};
 
 pub mod counter_mode;
 use counter_mode::{CounterMode, PartialRandom, RenewContext};

@@ -22,7 +22,7 @@ use super::Scru64Generator;
 ///
 /// ```rust
 /// # use scru64::Scru64Id;
-/// # use scru64::generator::node_spec::{NodeSpec, NodeSpecParseError};
+/// # use scru64::generator::{NodeSpec, NodeSpecParseError};
 /// let a = "42/8".parse::<NodeSpec>()?;
 /// assert_eq!(a.node_id(), 42);
 /// assert_eq!(a.node_id_size(), 8);
