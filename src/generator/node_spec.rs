@@ -1,3 +1,5 @@
+//! Node configuration specifier used to build a [`Scru64Generator`] and related error types.
+
 #[cfg(not(feature = "std"))]
 use core as std;
 use std::{fmt, str};
@@ -9,11 +11,34 @@ use super::Scru64Generator;
 
 /// Represents a node configuration specifier used to build a [`Scru64Generator`].
 ///
-/// A `NodeSpec` is usually expressed as a node spec string, which starts with a decimal `node_id`
-/// or 12-digit `node_prev` value, followed by a slash and a decimal `node_id_size` value ranging
-/// from 1 to 23 (e.g., `"42/8"`, `"0u2r85hm2pt3/16"`). The first form creates a fresh new
-/// generator with the given `node_id`, while the second form constructs one that generates
-/// subsequent SCRU64 IDs to the `node_prev`.
+/// A `NodeSpec` is usually expressed as a node spec string, which starts with a decimal `node_id`,
+/// a hexadecimal `node_id` prefixed with `"0x"`, or a 12-digit `node_prev` SCRU64 ID value,
+/// followed by a slash and a decimal `node_id_size` value ranging from 1 to 23 (e.g., `"42/8"`,
+/// `"0xb00/12"`, `"0u2r85hm2pt3/16"`). The first and second forms create a fresh new generator
+/// with the given `node_id`, while the third form constructs one that generates subsequent SCRU64
+/// IDs to the `node_prev`.
+///
+/// # Examples
+///
+/// ```rust
+/// # use scru64::Scru64Id;
+/// # use scru64::generator::node_spec::{NodeSpec, NodeSpecParseError};
+/// let a = "42/8".parse::<NodeSpec>()?;
+/// assert_eq!(a.node_id(), 42);
+/// assert_eq!(a.node_id_size(), 8);
+/// assert_eq!(a.node_prev(), None);
+///
+/// let b = "0xb00/12".parse::<NodeSpec>()?;
+/// assert_eq!(b.node_id(), 0xb00);
+/// assert_eq!(b.node_id_size(), 12);
+/// assert_eq!(b.node_prev(), None);
+///
+/// let c = "0u2r85hm2pt3/16".parse::<NodeSpec>()?;
+/// assert_eq!(c.node_id(), 11001);
+/// assert_eq!(c.node_id_size(), 16);
+/// assert_eq!(c.node_prev(), "0u2r85hm2pt3".parse::<Scru64Id>().ok());
+/// # Ok::<(), NodeSpecParseError>(())
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeSpec {
     node_prev: Scru64Id,
@@ -121,7 +146,12 @@ impl str::FromStr for NodeSpec {
             if lft.len() > 8 || lft.starts_with('+') {
                 return Err(LeftNodeId.into());
             }
-            let node_id = lft.parse().map_err(|_| LeftNodeId)?;
+            let node_id = if lft.starts_with("0X") || lft.starts_with("0x") {
+                u32::from_str_radix(&lft[2..], 16).map_err(|_| LeftNodeId)?
+            } else {
+                #[allow(clippy::from_str_radix_10)]
+                u32::from_str_radix(lft, 10).map_err(|_| LeftNodeId)?
+            };
             Self::with_node_id(node_id, node_id_size).map_err(|source| NodeSpec { source }.into())
         }
     }
@@ -162,6 +192,7 @@ impl fmt::Display for NodeSpecError {
     }
 }
 
+/// An error parsing an invalid node spec string representation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeSpecParseError {
     kind: NodeSpecParseErrorKind,
@@ -269,7 +300,6 @@ mod tests {
             "-42/8",
             "42/-8",
             "ab/8",
-            "0x42/8",
             "1/2/3",
             "0/0",
             "0/24",
