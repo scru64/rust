@@ -41,6 +41,7 @@ Default features:
 - `std` enables the primary `new()` and `new_string()` functions and configures
   `generator::Scru64Generator` with the system clock. Without `std`, this crate
   provides limited functionality available under `no_std` environments.
+- `global_gen`: TODO
 
 Optional features:
 

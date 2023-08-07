@@ -334,7 +334,6 @@ mod serde_support {
     #[cfg(test)]
     #[test]
     fn test() {
-        use serde::{Deserialize, Serialize};
         use serde_test::Token;
 
         for e in crate::test_cases::EXAMPLE_NODE_SPECS {

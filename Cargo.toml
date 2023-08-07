@@ -8,8 +8,9 @@ description = "SCRU64: Sortable, Clock-based, Realm-specifically Unique identifi
 repository = "https://github.com/scru64/rust"
 
 [features]
-default = ["std"]
+default = ["global_gen"]
 std = ["fstr/std"]
+global_gen = ["std"]
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }

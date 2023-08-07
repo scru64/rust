@@ -38,6 +38,7 @@
 //! - `std` enables the primary [`new()`] and [`new_string()`] functions and configures
 //!   [`generator::Scru64Generator`] with the system clock. Without `std`, this crate
 //!   provides limited functionality available under `no_std` environments.
+//! - `global_gen`: TODO
 //!
 //! Optional features:
 //!
@@ -53,10 +54,10 @@ mod identifier;
 
 pub use identifier::{ParseError, RangeError, Scru64Id};
 
-#[cfg(feature = "std")]
+#[cfg(feature = "global_gen")]
 pub use shortcut::{new, new_string};
 
-#[cfg(all(feature = "std", feature = "tokio"))]
+#[cfg(all(feature = "global_gen", feature = "tokio"))]
 pub use shortcut::async_tokio;
 
 #[cfg(test)]
@@ -65,8 +66,8 @@ mod test_cases;
 /// The total size in bits of the `node_id` and `counter` fields.
 const NODE_CTR_SIZE: u8 = 24;
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 mod shortcut {
     use std::{thread, time};
 

@@ -8,11 +8,11 @@ use node_spec::NodeSpec;
 pub mod counter_mode;
 use counter_mode::{CounterMode, PartialRandom, RenewContext};
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 mod global_gen;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "global_gen")]
 pub use global_gen::GlobalGenerator;
 
 /// Represents a SCRU64 ID generator.
