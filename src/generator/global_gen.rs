@@ -1,6 +1,6 @@
 use std::{env, sync};
 
-use super::{Scru64Generator, Scru64Id};
+use super::{NodeSpec, Scru64Generator, Scru64Id};
 
 /// A zero-sized type that forwards supported method calls to the process-wide global generator.
 ///
@@ -10,7 +10,9 @@ use super::{Scru64Generator, Scru64Id};
 /// # use scru64::generator::GlobalGenerator;
 /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
 ///
-/// assert_eq!(GlobalGenerator.node_spec(), "42/8");
+/// assert_eq!(GlobalGenerator.node_id(), 42);
+/// assert_eq!(GlobalGenerator.node_id_size(), 8);
+/// assert_eq!(GlobalGenerator.node_spec().to_string(), "42/8");
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GlobalGenerator;
@@ -21,10 +23,10 @@ impl GlobalGenerator {
 
         G.get_or_init(|| {
             let node_spec = env::var("SCRU64_NODE_SPEC")
-                .expect("scru64: could not read config from SCRU64_NODE_SPEC env var");
-            let g = Scru64Generator::parse(&node_spec)
+                .expect("scru64: could not read config from SCRU64_NODE_SPEC env var")
+                .parse()
                 .expect("scru64: could not initialize global generator");
-            sync::Mutex::new(g)
+            sync::Mutex::new(Scru64Generator::new(node_spec))
         })
         .lock()
         .expect("scru64: could not lock global generator")
@@ -33,11 +35,6 @@ impl GlobalGenerator {
     /// Calls [`Scru64Generator::generate`] of the global generator.
     pub fn generate(&self) -> Option<Scru64Id> {
         self.lock().generate()
-    }
-
-    /// Calls [`Scru64Generator::node_prev`] of the global generator.
-    pub fn node_prev(&self) -> Option<Scru64Id> {
-        self.lock().node_prev()
     }
 
     /// Calls [`Scru64Generator::node_id`] of the global generator.
@@ -51,7 +48,7 @@ impl GlobalGenerator {
     }
 
     /// Calls [`Scru64Generator::node_spec`] of the global generator.
-    pub fn node_spec(&self) -> String {
+    pub fn node_spec(&self) -> NodeSpec {
         self.lock().node_spec()
     }
 }
