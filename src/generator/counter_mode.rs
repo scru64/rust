@@ -5,24 +5,24 @@ use crate::NODE_CTR_SIZE;
 #[cfg(doc)]
 use super::Scru64Generator;
 
-/// A trait to customize the initial counter value for each new timestamp.
+/// A trait to customize the initial counter value for each new `timestamp`.
 ///
-/// [`Scru64Generator`] calls `init_counter()` to obtain the initial counter value when the
-/// `timestamp` field has changed since the immediately preceding ID. Types implementing this trait
-/// may apply their respective logic to calculate the initial counter value.
-pub trait InitCounter {
+/// [`Scru64Generator`] calls `renew()` to obtain the initial counter value when the `timestamp`
+/// field has changed since the immediately preceding ID. Types implementing this trait may apply
+/// their respective logic to calculate the initial counter value.
+pub trait CounterMode {
     /// Returns the next initial counter value of `counter_size` bits.
     ///
     /// [`Scru64Generator`] passes the `counter_size` (from 1 to 23) and other context information
-    /// that might be useful for counter initialization. The returned value must be within the
-    /// range of `counter_size`-bit unsigned integer.
-    fn init_counter(&mut self, counter_size: u8, context: &InitCounterContext) -> u32;
+    /// that may be useful for counter renewal. The returned value must be within the range of
+    /// `counter_size`-bit unsigned integer.
+    fn renew(&mut self, counter_size: u8, context: &RenewContext) -> u32;
 }
 
-/// Represents the context information provided by [`Scru64Generator`] to [`InitCounter`].
+/// Represents the context information provided by [`Scru64Generator`] to [`CounterMode::renew()`].
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct InitCounterContext {
+pub struct RenewContext {
     pub timestamp: u64,
     pub node_id: u32,
 }
@@ -33,8 +33,8 @@ pub struct InitCounterContext {
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct ZeroStarting;
 
-impl InitCounter for ZeroStarting {
-    fn init_counter(&mut self, _: u8, _: &InitCounterContext) -> u32 {
+impl CounterMode for ZeroStarting {
+    fn renew(&mut self, _: u8, _: &RenewContext) -> u32 {
         0
     }
 }
@@ -71,7 +71,7 @@ impl PartialRandom {
 
     /// Initializes the random number generator.
     #[cold]
-    fn new_rng(&self, counter_size: u8, context: &InitCounterContext) -> u64 {
+    fn new_rng(&self, counter_size: u8, context: &RenewContext) -> u64 {
         // use context and variable addresses as seed
         #[cfg(feature = "std")]
         let addr = Box::into_raw(Box::new(42)) as u64;
@@ -82,8 +82,8 @@ impl PartialRandom {
     }
 }
 
-impl InitCounter for PartialRandom {
-    fn init_counter(&mut self, counter_size: u8, context: &InitCounterContext) -> u32 {
+impl CounterMode for PartialRandom {
+    fn renew(&mut self, counter_size: u8, context: &RenewContext) -> u32 {
         debug_assert!(counter_size < NODE_CTR_SIZE);
         if self.rng == 0 {
             self.rng = self.new_rng(counter_size, context);
@@ -107,8 +107,10 @@ impl InitCounter for PartialRandom {
 mod tests {
     use super::*;
 
-    fn mock_context() -> InitCounterContext {
-        InitCounterContext {
+    const N: usize = 1024;
+
+    fn mock_context() -> RenewContext {
+        RenewContext {
             timestamp: 0x0123_4567_89ab,
             node_id: 0,
         }
@@ -117,13 +119,11 @@ mod tests {
     /// `ZeroStarting` always returns zero.
     #[test]
     fn zero_starting() {
-        const N: usize = 1024;
-
         let context = mock_context();
         for counter_size in 1..NODE_CTR_SIZE {
             let mut c = ZeroStarting;
             for _ in 0..N {
-                assert_eq!(c.init_counter(counter_size, &context), 0);
+                assert_eq!(c.renew(counter_size, &context), 0);
             }
         }
     }
@@ -131,7 +131,6 @@ mod tests {
     /// `PartialRandom` returns random numbers, setting the leading guard bits to zero.
     #[test]
     fn partial_random() {
-        const N: usize = 1024;
         // set margin based on binom dist 99.999% confidence interval
         let margin = 4.417173 * (0.5 * 0.5 / N as f64).sqrt();
 
@@ -143,7 +142,7 @@ mod tests {
 
                 let mut c = PartialRandom::new(overflow_guard_size);
                 for _ in 0..N {
-                    let mut n = c.init_counter(counter_size, &context);
+                    let mut n = c.renew(counter_size, &context);
                     for e in counts_by_pos.iter_mut() {
                         *e += n & 1;
                         n >>= 1;

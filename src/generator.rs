@@ -6,7 +6,7 @@ pub mod node_spec;
 use node_spec::NodeSpec;
 
 pub mod counter_mode;
-use counter_mode::{InitCounter, InitCounterContext, PartialRandom};
+use counter_mode::{CounterMode, PartialRandom, RenewContext};
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
@@ -77,7 +77,7 @@ impl<C> Scru64Generator<C> {
     }
 }
 
-impl<C: InitCounter> Scru64Generator<C> {
+impl<C: CounterMode> Scru64Generator<C> {
     /// Creates a new generator with the given node configuration and counter initialization mode.
     pub const fn with_counter_mode(node_spec: NodeSpec, counter_mode: C) -> Self {
         Self {
@@ -88,15 +88,13 @@ impl<C: InitCounter> Scru64Generator<C> {
     }
 
     /// Calculates the combined `node_ctr` field value for the next `timestamp` tick.
-    fn init_node_ctr(&mut self, timestamp: u64) -> u32 {
+    fn renew_node_ctr(&mut self, timestamp: u64) -> u32 {
         let node_id = self.node_id();
-        let counter = self.counter_mode.init_counter(
-            self.counter_size,
-            &InitCounterContext { timestamp, node_id },
-        );
+        let context = RenewContext { timestamp, node_id };
+        let counter = self.counter_mode.renew(self.counter_size, &context);
         assert!(
             counter < (1 << self.counter_size),
-            "illegal `InitCounter` implementation"
+            "illegal `CounterMode` implementation"
         );
         (node_id << self.counter_size) | counter
     }
@@ -118,7 +116,7 @@ impl<C: InitCounter> Scru64Generator<C> {
         } else {
             // reset state and resume
             let timestamp = unix_ts_ms >> 8;
-            self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
             self.prev
         }
     }
@@ -149,7 +147,7 @@ impl<C: InitCounter> Scru64Generator<C> {
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
-            self.prev = Scru64Id::from_parts(timestamp, self.init_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
         } else if timestamp + allowance >= prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
@@ -160,7 +158,7 @@ impl<C: InitCounter> Scru64Generator<C> {
                 // increment timestamp at counter overflow
                 self.prev = Scru64Id::from_parts(
                     prev_timestamp + 1,
-                    self.init_node_ctr(prev_timestamp + 1),
+                    self.renew_node_ctr(prev_timestamp + 1),
                 );
             }
         } else {
@@ -174,7 +172,7 @@ impl<C: InitCounter> Scru64Generator<C> {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{InitCounter, Scru64Generator, Scru64Id};
+    use super::{CounterMode, Scru64Generator, Scru64Id};
 
     /// Returns the current Unix timestamp in milliseconds.
     fn unix_ts_ms() -> u64 {
@@ -185,7 +183,7 @@ mod std_ext {
             .as_millis() as u64
     }
 
-    impl<C: InitCounter> Scru64Generator<C> {
+    impl<C: CounterMode> Scru64Generator<C> {
         /// Generates a new SCRU64 ID object from the current `timestamp`, or returns `None` upon
         /// significant timestamp rollback.
         ///
