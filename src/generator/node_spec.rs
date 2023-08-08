@@ -268,7 +268,7 @@ mod tests {
             assert_eq!(with_node_id.node_id(), e.node_id);
             assert_eq!(with_node_id.node_id_size(), e.node_id_size);
             assert!(with_node_id.node_prev().is_none());
-            if e.spec_type == "new" {
+            if e.spec_type.ends_with("_node_id") {
                 assert_eq!(with_node_id.node_prev_raw(), node_prev);
             }
 
@@ -282,11 +282,11 @@ mod tests {
 
             #[cfg(feature = "std")]
             {
-                if e.spec_type == "new" {
-                    assert_eq!(with_node_id.to_string(), e.node_spec);
+                if e.spec_type.ends_with("_node_id") {
+                    assert_eq!(with_node_id.to_string(), e.canonical);
                 }
-                assert_eq!(parsed.to_string(), e.node_spec);
-                assert_eq!(with_node_prev.to_string(), e.node_spec);
+                assert_eq!(parsed.to_string(), e.canonical);
+                assert_eq!(with_node_prev.to_string(), e.canonical);
             }
         }
     }
@@ -376,8 +376,8 @@ mod serde_support {
 
         for e in crate::test_cases::EXAMPLE_NODE_SPECS {
             let x = e.node_spec.parse::<NodeSpec>().unwrap();
-            serde_test::assert_tokens(&x, &[Token::Str(e.node_spec)]);
-            serde_test::assert_de_tokens(&x, &[Token::Bytes(e.node_spec.as_bytes())]);
+            serde_test::assert_tokens(&x, &[Token::Str(e.canonical)]);
+            serde_test::assert_de_tokens(&x, &[Token::Bytes(e.canonical.as_bytes())]);
         }
     }
 }
