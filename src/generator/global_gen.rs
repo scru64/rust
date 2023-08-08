@@ -7,7 +7,8 @@ use super::{NodeSpec, Scru64Generator, Scru64Id};
 /// # Examples
 ///
 /// ```rust
-/// # use scru64::generator::GlobalGenerator;
+/// use scru64::generator::GlobalGenerator;
+///
 /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
 ///
 /// assert_eq!(GlobalGenerator.node_id(), 42);
@@ -17,10 +18,10 @@ use super::{NodeSpec, Scru64Generator, Scru64Id};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GlobalGenerator;
 
+static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
+
 impl GlobalGenerator {
     fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
-        static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
-
         G.get_or_init(|| {
             let node_spec = env::var("SCRU64_NODE_SPEC")
                 .expect("scru64: could not read config from SCRU64_NODE_SPEC env var")
@@ -30,6 +31,34 @@ impl GlobalGenerator {
         })
         .lock()
         .expect("scru64: could not lock global generator")
+    }
+
+    /// Configures the global generator with a node spec, discarding the existing configuration if
+    /// any.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use scru64::generator::GlobalGenerator;
+    ///
+    /// GlobalGenerator.configure("0xb00/12".parse()?);
+    /// assert_eq!(GlobalGenerator.node_id(), 0xb00);
+    /// assert_eq!(GlobalGenerator.node_id_size(), 12);
+    /// assert_eq!(GlobalGenerator.node_spec().to_string(), "2816/12");
+    ///
+    /// GlobalGenerator.configure("0u2r85hm2pt3/16".parse()?);
+    /// assert_eq!(GlobalGenerator.node_id(), 11001);
+    /// assert_eq!(GlobalGenerator.node_id_size(), 16);
+    /// assert_eq!(GlobalGenerator.node_spec().to_string(), "0u2r85hm2pt3/16");
+    /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
+    /// ```
+    pub fn configure(&self, node_spec: NodeSpec) {
+        let mut g = Some(Scru64Generator::new(node_spec));
+        G.get_or_init(|| sync::Mutex::new(g.take().unwrap()));
+        if let Some(g) = g {
+            // replace current one if get_or_init closure was not called
+            *self.lock() = g;
+        }
     }
 
     /// Calls [`Scru64Generator::generate`] of the global generator.
