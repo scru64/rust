@@ -18,11 +18,11 @@ std::env::set_var("SCRU64_NODE_SPEC", "42/8");
 
 // generate a new identifier object
 let x = scru64::new();
-println!("{x}"); // e.g. "0u2r85hm2pt3"
+println!("{x}"); // e.g., "0u2r85hm2pt3"
 println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 
 // generate a textual representation directly
-println!("{}", scru64::new_string()); // e.g. "0u2r85hm2pt4"
+println!("{}", scru64::new_string()); // e.g., "0u2r85hm2pt4"
 ```
 
 See [SCRU64 Specification] for details.
@@ -38,16 +38,18 @@ unique time-ordered identifiers, consider [SCRU128].
 
 Default features:
 
-- `std` enables the primary `new()` and `new_string()` functions and configures
-  `generator::Scru64Generator` with the system clock. Without `std`, this crate
-  provides limited functionality available under `no_std` environments.
-- `global_gen`: TODO
+- `std` integrates the library with, among others, the system clock to draw
+  current timestamps. Without `std`, this crate provides limited functionality
+  available under `no_std` environments.
+- `global_gen` (implies `std`) enables the primary `new()` and `new_string()`
+  functions and the process-wide global generator under the hood.
 
 Optional features:
 
 - `serde` enables serialization/deserialization via serde.
-- `tokio` enables the `async_tokio::new()` and `async_tokio::new_string()`
-  functions, the non-blocking counterpart of `new()` and `new_string()`.
+- `tokio` (together with `global_gen`) enables the `async_tokio::new()` and
+  `async_tokio::new_string()` functions, the non-blocking counterpart of `new()`
+  and `new_string()`.
 
 ## License
 

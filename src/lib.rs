@@ -15,11 +15,11 @@
 //!
 //! // generate a new identifier object
 //! let x = scru64::new();
-//! println!("{x}"); // e.g. "0u2r85hm2pt3"
+//! println!("{x}"); // e.g., "0u2r85hm2pt3"
 //! println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 //!
 //! // generate a textual representation directly
-//! println!("{}", scru64::new_string()); // e.g. "0u2r85hm2pt4"
+//! println!("{}", scru64::new_string()); // e.g., "0u2r85hm2pt4"
 //! ```
 //!
 //! See [SCRU64 Specification] for details.
@@ -35,16 +35,18 @@
 //!
 //! Default features:
 //!
-//! - `std` enables the primary [`new()`] and [`new_string()`] functions and configures
-//!   [`generator::Scru64Generator`] with the system clock. Without `std`, this crate
-//!   provides limited functionality available under `no_std` environments.
-//! - `global_gen`: TODO
+//! - `std` integrates the library with, among others, the system clock to draw
+//!   current timestamps. Without `std`, this crate provides limited functionality
+//!   available under `no_std` environments.
+//! - `global_gen` (implies `std`) enables the primary [`new()`] and [`new_string()`]
+//!   functions and the process-wide global generator under the hood.
 //!
 //! Optional features:
 //!
 //! - `serde` enables serialization/deserialization via serde.
-//! - `tokio` enables the [`async_tokio::new()`] and [`async_tokio::new_string()`]
-//!   functions, the non-blocking counterpart of `new()` and `new_string()`.
+//! - `tokio` (together with `global_gen`) enables the [`async_tokio::new()`] and
+//!   [`async_tokio::new_string()`] functions, the non-blocking counterpart of [`new()`]
+//!   and [`new_string()`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -77,9 +79,10 @@ mod shortcut {
 
     /// Generates a new SCRU64 ID object using the global generator.
     ///
-    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
-    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
-    /// (e.g., `"42/8"`, `"12345/16"`).
+    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable by default, and it panics if it fails to read a well-formed node spec
+    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
+    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_tokio::new`]
@@ -87,7 +90,7 @@ mod shortcut {
     ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the environment variable.
+    /// Panics if the global generator is not properly configured.
     pub fn new() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
@@ -101,9 +104,10 @@ mod shortcut {
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
     ///
-    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
-    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
-    /// (e.g., `"42/8"`, `"12345/16"`).
+    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable by default, and it panics if it fails to read a well-formed node spec
+    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
+    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see
@@ -111,7 +115,7 @@ mod shortcut {
     ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the environment variable.
+    /// Panics if the global generator is not properly configured.
     pub fn new_string() -> String {
         new().into()
     }
@@ -124,17 +128,18 @@ mod shortcut {
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
-        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
-        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable by default, and it panics if it fails to read a well-formed node
+        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
+        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
+        /// string format.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
         ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the environment
-        /// variable.
+        /// Panics if the global generator is not properly configured.
         pub async fn new() -> Scru64Id {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
@@ -148,17 +153,18 @@ mod shortcut {
         /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using
         /// the global generator.
         ///
-        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
-        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable by default, and it panics if it fails to read a well-formed node
+        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
+        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
+        /// string format.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
         ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the environment
-        /// variable.
+        /// Panics if the global generator is not properly configured.
         pub async fn new_string() -> String {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {

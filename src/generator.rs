@@ -49,8 +49,10 @@ impl Scru64Generator {
     /// # Examples
     ///
     /// ```rust
-    /// # use scru64::generator::Scru64Generator;
-    /// let g = Scru64Generator::new("42/8".parse().unwrap());
+    /// use scru64::generator::Scru64Generator;
+    ///
+    /// let g = Scru64Generator::new("42/8".parse()?);
+    /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
     /// ```
     pub const fn new(node_spec: NodeSpec) -> Self {
         Self::with_counter_mode(node_spec, PartialRandom::new(1))

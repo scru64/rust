@@ -4,6 +4,11 @@ use super::{NodeSpec, Scru64Generator, Scru64Id};
 
 /// A zero-sized type that forwards supported method calls to the process-wide global generator.
 ///
+/// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
+/// variable by default, and it panics if it fails to read a well-formed node spec string (e.g.,
+/// `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first called. See also
+/// [`NodeSpec`] for the node spec string format.
+///
 /// # Examples
 ///
 /// ```rust

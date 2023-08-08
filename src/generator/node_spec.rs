@@ -21,8 +21,8 @@ use super::Scru64Generator;
 /// # Examples
 ///
 /// ```rust
-/// # use scru64::Scru64Id;
-/// # use scru64::generator::{NodeSpec, NodeSpecParseError};
+/// use scru64::generator::NodeSpec;
+///
 /// let a = "42/8".parse::<NodeSpec>()?;
 /// assert_eq!(a.node_id(), 42);
 /// assert_eq!(a.node_id_size(), 8);
@@ -36,8 +36,11 @@ use super::Scru64Generator;
 /// let c = "0u2r85hm2pt3/16".parse::<NodeSpec>()?;
 /// assert_eq!(c.node_id(), 11001);
 /// assert_eq!(c.node_id_size(), 16);
-/// assert_eq!(c.node_prev(), "0u2r85hm2pt3".parse::<Scru64Id>().ok());
-/// # Ok::<(), NodeSpecParseError>(())
+/// assert_eq!(
+///     c.node_prev(),
+///     "0u2r85hm2pt3".parse::<scru64::Scru64Id>().ok()
+/// );
+/// # Ok::<(), scru64::generator::NodeSpecParseError>(())
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeSpec {
@@ -166,9 +169,14 @@ impl fmt::Display for NodeSpec {
     }
 }
 
+/// An error representing an invalid pair of `node_id` and `node_id_size` to construct a
+/// [`NodeSpec`] instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeSpecError {
+    /// Indicates that `node_id_size` is out of range.
     NodeIdSize { node_id_size: u8 },
+
+    /// Indicates that `node_id` is out of `node_id_size`-bit range.
     NodeIdRange { node_id: u32, node_id_size: u8 },
 }
 
@@ -220,7 +228,7 @@ impl fmt::Display for NodeSpecParseError {
         match &self.kind {
             Syntax => write!(
                 f,
-                "syntax error (expected: e.g., `42/8`, `0u2r85hm2pt3/16`)"
+                r#"syntax error (expected: e.g., "42/8", "0xb00/12", "0u2r85hm2pt3/16")"#
             ),
             Right => write!(f, "could not parse string as `node_id_size`"),
             LeftPrev { source } => write!(f, "{}", source),
