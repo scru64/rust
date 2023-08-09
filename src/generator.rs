@@ -6,7 +6,7 @@ mod node_spec;
 pub use node_spec::{NodeSpec, NodeSpecError, NodeSpecParseError};
 
 pub mod counter_mode;
-use counter_mode::{CounterMode, PartialRandom, RenewContext};
+use counter_mode::{CounterMode, DefaultCounterMode, RenewContext};
 
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
@@ -37,7 +37,7 @@ pub use global_gen::GlobalGenerator;
 /// [`generate_or_abort_core`]: Scru64Generator::generate_or_abort_core
 /// [`generate_or_reset_core`]: Scru64Generator::generate_or_reset_core
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Scru64Generator<C = PartialRandom> {
+pub struct Scru64Generator<C = DefaultCounterMode> {
     prev: Scru64Id,
     counter_size: u8,
     counter_mode: C,
@@ -55,7 +55,12 @@ impl Scru64Generator {
     /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
     /// ```
     pub const fn new(node_spec: NodeSpec) -> Self {
-        Self::with_counter_mode(node_spec, PartialRandom::new(1))
+        if node_spec.node_id_size() < 20 {
+            Self::with_counter_mode(node_spec, DefaultCounterMode::new(0))
+        } else {
+            // reserve one overflow guard bit if `counter_size` is four or less
+            Self::with_counter_mode(node_spec, DefaultCounterMode::new(1))
+        }
     }
 }
 

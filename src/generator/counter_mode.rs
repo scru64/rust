@@ -27,39 +27,20 @@ pub struct RenewContext {
     pub node_id: u32,
 }
 
-/// The zero-starting counter mode.
-///
-/// With this strategy, the counter is reset to zero for each new `timestamp` tick.
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ZeroStarting;
-
-impl CounterMode for ZeroStarting {
-    fn renew(&mut self, _: u8, _: &RenewContext) -> u32 {
-        0
-    }
-}
-
-/// The partial random counter mode.
+/// The default "initialize a portion counter" strategy.
 ///
 /// With this strategy, the counter is reset to a random number for each new `timestamp` tick, but
 /// some specified leading bits are set to zero to reserve space as the counter overflow guard.
 ///
 /// Note that the random number generator employed is not cryptographically strong nor is securely
 /// seeded. This mode does not pay for security because a small random number is insecure anyway.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PartialRandom {
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct DefaultCounterMode {
     overflow_guard_size: u8,
     rng: u64,
 }
 
-impl Default for PartialRandom {
-    /// Equivalent to `PartialRandom::new(1)`.
-    fn default() -> Self {
-        Self::new(1)
-    }
-}
-
-impl PartialRandom {
+impl DefaultCounterMode {
     /// Creates a new instance with the size (in bits) of overflow guard bits.
     pub const fn new(overflow_guard_size: u8) -> Self {
         assert!(overflow_guard_size < NODE_CTR_SIZE);
@@ -82,7 +63,7 @@ impl PartialRandom {
     }
 }
 
-impl CounterMode for PartialRandom {
+impl CounterMode for DefaultCounterMode {
     fn renew(&mut self, counter_size: u8, context: &RenewContext) -> u32 {
         debug_assert!(counter_size < NODE_CTR_SIZE);
         if self.rng == 0 {
@@ -103,59 +84,42 @@ impl CounterMode for PartialRandom {
     }
 }
 
+/// `DefaultCounterMode` returns random numbers, setting the leading guard bits to zero.
+///
+/// This case includes statistical tests for the random number generator and thus may fail at a
+/// certain low probability.
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[test]
+fn test_that_may_fail_at_low_probability() {
+    const N: usize = 4096;
 
-    const N: usize = 1024;
+    // set margin based on binom dist 99.999999% confidence interval
+    let margin = 5.730729 * (0.5 * 0.5 / N as f64).sqrt();
 
-    fn mock_context() -> RenewContext {
-        RenewContext {
-            timestamp: 0x0123_4567_89ab,
-            node_id: 0,
-        }
-    }
+    let context = RenewContext {
+        timestamp: 0x0123_4567_89ab,
+        node_id: 0,
+    };
+    for counter_size in 1..NODE_CTR_SIZE {
+        for overflow_guard_size in 0..NODE_CTR_SIZE {
+            // count number of set bits by bit position (from LSB to MSB)
+            let mut counts_by_pos = [0u32; NODE_CTR_SIZE as usize];
 
-    /// `ZeroStarting` always returns zero.
-    #[test]
-    fn zero_starting() {
-        let context = mock_context();
-        for counter_size in 1..NODE_CTR_SIZE {
-            let mut c = ZeroStarting;
+            let mut c = DefaultCounterMode::new(overflow_guard_size);
             for _ in 0..N {
-                assert_eq!(c.renew(counter_size, &context), 0);
+                let mut n = c.renew(counter_size, &context);
+                for e in counts_by_pos.iter_mut() {
+                    *e += n & 1;
+                    n >>= 1;
+                }
             }
-        }
-    }
 
-    /// `PartialRandom` returns random numbers, setting the leading guard bits to zero.
-    #[test]
-    fn partial_random() {
-        // set margin based on binom dist 99.999% confidence interval
-        let margin = 4.417173 * (0.5 * 0.5 / N as f64).sqrt();
-
-        let context = mock_context();
-        for counter_size in 1..NODE_CTR_SIZE {
-            for overflow_guard_size in 0..NODE_CTR_SIZE {
-                // count number of set bits by bit position (from LSB to MSB)
-                let mut counts_by_pos = [0u32; NODE_CTR_SIZE as usize];
-
-                let mut c = PartialRandom::new(overflow_guard_size);
-                for _ in 0..N {
-                    let mut n = c.renew(counter_size, &context);
-                    for e in counts_by_pos.iter_mut() {
-                        *e += n & 1;
-                        n >>= 1;
-                    }
-                }
-
-                let filled = counter_size.saturating_sub(overflow_guard_size) as usize;
-                for &e in counts_by_pos[..filled].iter() {
-                    assert!((e as f64 / N as f64 - 0.5).abs() < margin);
-                }
-                for &e in counts_by_pos[filled..].iter() {
-                    assert_eq!(e, 0);
-                }
+            let filled = counter_size.saturating_sub(overflow_guard_size) as usize;
+            for &e in counts_by_pos[..filled].iter() {
+                assert!((e as f64 / N as f64 - 0.5).abs() < margin);
+            }
+            for &e in counts_by_pos[filled..].iter() {
+                assert_eq!(e, 0);
             }
         }
     }
