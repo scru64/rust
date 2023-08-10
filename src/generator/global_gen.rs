@@ -29,9 +29,16 @@ impl GlobalGenerator {
     fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
         G.get_or_init(|| {
             let node_spec = env::var("SCRU64_NODE_SPEC")
-                .expect("scru64: could not read config from SCRU64_NODE_SPEC env var")
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "scru64: could not read config from SCRU64_NODE_SPEC env var: {}",
+                        err
+                    )
+                })
                 .parse()
-                .expect("scru64: could not initialize global generator");
+                .unwrap_or_else(|err| {
+                    panic!("scru64: could not initialize global generator: {}", err)
+                });
             sync::Mutex::new(Scru64Generator::new(node_spec))
         })
         .lock()
