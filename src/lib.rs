@@ -52,8 +52,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod generator;
-mod identifier;
 
+mod identifier;
 pub use identifier::{ParseError, RangeError, Scru64Id};
 
 #[cfg(feature = "global_gen")]
@@ -120,6 +120,20 @@ mod shortcut {
         new().into()
     }
 
+    /// Generates 100k monotonically increasing IDs.
+    #[cfg(test)]
+    #[test]
+    fn test() {
+        std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+
+        let mut prev = new_string();
+        for _ in 0..100_000 {
+            let curr = new_string();
+            assert!(prev < curr);
+            prev = curr;
+        }
+    }
+
     /// Non-blocking global generator functions using `tokio`.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
@@ -172,6 +186,20 @@ mod shortcut {
                 } else {
                     tokio::time::sleep(DELAY).await;
                 }
+            }
+        }
+
+        /// Generates 100k monotonically increasing IDs.
+        #[cfg(test)]
+        #[tokio::test]
+        async fn test() {
+            std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+
+            let mut prev = new_string().await;
+            for _ in 0..100_000 {
+                let curr = new_string().await;
+                assert!(prev < curr);
+                prev = curr;
             }
         }
     }

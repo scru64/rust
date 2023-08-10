@@ -530,9 +530,10 @@ mod serde_support {
     #[cfg(test)]
     #[test]
     fn test() {
+        use crate::test_cases::EXAMPLE_IDS;
         use serde_test::{Configure, Token};
 
-        for e in crate::test_cases::EXAMPLE_IDS {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
             serde_test::assert_tokens(&x.readable(), &[Token::Str(e.text)]);
             serde_test::assert_tokens(&x.compact(), &[Token::U64(e.num)]);
