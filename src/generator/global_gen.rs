@@ -1,4 +1,4 @@
-use std::{env, sync};
+use std::{env, error, fmt, sync};
 
 use super::{NodeSpec, Scru64Generator, Scru64Id};
 
@@ -26,19 +26,11 @@ pub struct GlobalGenerator;
 static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
 
 impl GlobalGenerator {
-    fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
+    fn lock(&self) -> sync::MutexGuard<'static, Scru64Generator> {
         G.get_or_init(|| {
-            let node_spec = env::var("SCRU64_NODE_SPEC")
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "scru64: could not read config from SCRU64_NODE_SPEC env var: {}",
-                        err
-                    )
-                })
-                .parse()
-                .unwrap_or_else(|err| {
-                    panic!("scru64: could not initialize global generator: {}", err)
-                });
+            use error::Error as _;
+            let node_spec = read_env_var("SCRU64_NODE_SPEC")
+                .unwrap_or_else(|err| panic!("scru64: {}: {}", err, err.source().unwrap()));
             sync::Mutex::new(Scru64Generator::new(node_spec))
         })
         .lock()
@@ -91,5 +83,38 @@ impl GlobalGenerator {
     /// Calls [`Scru64Generator::node_spec`] of the global generator.
     pub fn node_spec(&self) -> NodeSpec {
         self.lock().node_spec()
+    }
+}
+
+/// Reads the node spec from the environment variable.
+fn read_env_var(key: &str) -> Result<NodeSpec, EnvVarError> {
+    env::var(key)
+        .map_err(|err| EnvVarError {
+            key,
+            source: Box::new(err),
+        })?
+        .parse()
+        .map_err(|err| EnvVarError {
+            key,
+            source: Box::new(err),
+        })
+}
+
+/// An error reading the node spec from the environment variable.
+#[derive(Debug)]
+struct EnvVarError<'a> {
+    key: &'a str,
+    source: Box<dyn error::Error>,
+}
+
+impl<'a> fmt::Display for EnvVarError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "could not read config from {} env var", self.key)
+    }
+}
+
+impl<'a> error::Error for EnvVarError<'a> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(self.source.as_ref())
     }
 }
