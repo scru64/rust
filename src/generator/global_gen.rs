@@ -81,10 +81,13 @@ impl GlobalGenerator {
     /// ```
     pub fn configure(&self, node_spec: NodeSpec) {
         let mut g = Some(Scru64Generator::new(node_spec));
-        G.get_or_init(|| sync::Mutex::new(g.take().unwrap()));
+        let mut lock = G
+            .get_or_init(|| sync::Mutex::new(g.take().unwrap()))
+            .lock()
+            .expect("scru64: could not lock global generator");
         if let Some(g) = g {
             // replace current one if get_or_init closure was not called
-            *self.lock() = g;
+            *lock = g;
         }
     }
 
