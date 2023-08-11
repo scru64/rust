@@ -1,6 +1,6 @@
 #[cfg(not(feature = "std"))]
 use core as std;
-use std::{fmt, str};
+use std::{any, fmt, str};
 
 use fstr::FStr;
 
@@ -47,11 +47,6 @@ impl Scru64Id {
     /// The maximum valid value (i.e., `zzzzzzzzzzzz`).
     pub const MAX: Self = Scru64Id(36u64.pow(12) - 1);
 
-    /// Returns the integer representation.
-    pub const fn to_u64(self) -> u64 {
-        self.0
-    }
-
     /// Creates a value from a 64-bit integer in the `const` context.
     ///
     /// # Panics
@@ -60,7 +55,7 @@ impl Scru64Id {
     pub const fn const_from_u64(value: u64) -> Self {
         match Self::try_from_u64(value) {
             Ok(t) => t,
-            Err(_) => panic!("out of valid integer range"),
+            Err(_) => panic!("could not convert integer to SCRU64 ID: `u64` out of range"),
         }
     }
 
@@ -69,11 +64,76 @@ impl Scru64Id {
     /// # Errors
     ///
     /// Returns `Err` if the argument is out of the valid value range.
-    const fn try_from_u64(value: u64) -> Result<Self, ConversionError> {
+    const fn try_from_u64(value: u64) -> Result<Self, RangeError<u64>> {
         if value <= Self::MAX.0 {
             Ok(Self(value))
         } else {
-            Err(ConversionError::OutOfRange)
+            Err(RangeError { value })
+        }
+    }
+
+    /// Returns the integer representation.
+    pub const fn to_u64(self) -> u64 {
+        self.0
+    }
+
+    /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any argument is out of the valid value range.
+    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
+        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
+        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
+        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
+    }
+
+    /// Returns the `timestamp` field value.
+    pub const fn timestamp(self) -> u64 {
+        self.0 >> NODE_CTR_SIZE
+    }
+
+    /// Returns the `node_id` and `counter` field values combined as a single integer.
+    pub const fn node_ctr(self) -> u32 {
+        self.0 as u32 & MAX_NODE_CTR
+    }
+
+    /// Creates a value from a 12-digit string representation in the `const` context.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the argument is not a valid string representation.
+    pub const fn const_from_str(value: &str) -> Self {
+        match Self::try_from_str(value) {
+            Ok(t) => t,
+            Err(_) => panic!("could not parse string as SCRU64 ID"),
+        }
+    }
+
+    /// Creates a value from a 12-digit string representation in the `const` context.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the argument is not a valid string representation.
+    const fn try_from_str(value: &str) -> Result<Self, ParseError> {
+        if value.len() != 12 {
+            Err(ParseError::invalid_length(value.len()))
+        } else {
+            let buffer = value.as_bytes();
+            let mut n = 0u64;
+            let mut i = 0;
+            while i < value.len() {
+                let e = DECODE_MAP[buffer[i] as usize];
+                if e == 0xff {
+                    return Err(ParseError::invalid_digit(value, i));
+                }
+                n = n * 36 + e as u64;
+                i += 1;
+            }
+            match Self::try_from_u64(n) {
+                Ok(t) => Ok(t),
+                Err(_) => unreachable!(),
+            }
         }
     }
 
@@ -89,7 +149,7 @@ impl Scru64Id {
     /// let y = x.encode();
     /// assert_eq!(y, "0u2r87q2rol5");
     /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
-    /// # Ok::<(), scru64::ConversionError>(())
+    /// # Ok::<(), scru64::ParseError>(())
     /// ```
     pub const fn encode(self) -> FStr<12> {
         let mut buffer = [0u8; 12];
@@ -101,66 +161,19 @@ impl Scru64Id {
             buffer[i] = DIGITS[rem as usize];
             n = quo;
         }
+        debug_assert!(n == 0);
+
         // SAFETY: ok because buffer consists of ASCII code points
         debug_assert!(str::from_utf8(&buffer).is_ok());
         unsafe { FStr::from_inner_unchecked(buffer) }
     }
+}
 
-    /// Creates a value from a 12-digit string representation in the `const` context.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the argument is not a valid string representation.
-    pub const fn const_from_str(value: &str) -> Self {
-        match Self::try_from_str(value) {
-            Ok(t) => t,
-            Err(_) => panic!("invalid string representation"),
-        }
-    }
+impl TryFrom<u64> for Scru64Id {
+    type Error = RangeError<u64>;
 
-    /// Creates a value from a 12-digit string representation in the `const` context.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` if the argument is not a valid string representation.
-    const fn try_from_str(value: &str) -> Result<Self, ConversionError> {
-        if value.len() != 12 {
-            Err(ConversionError::InvalidLength)
-        } else {
-            let buffer = value.as_bytes();
-            let mut n = 0u64;
-            let mut i = 0;
-            while i < value.len() {
-                let e = DECODE_MAP[buffer[i] as usize];
-                if e == 0xff {
-                    return Err(ConversionError::InvalidDigit);
-                }
-                n = n * 36 + e as u64;
-                i += 1;
-            }
-            Self::try_from_u64(n)
-        }
-    }
-
-    /// Returns the `timestamp` field value.
-    pub const fn timestamp(self) -> u64 {
-        self.0 >> NODE_CTR_SIZE
-    }
-
-    /// Returns the `node_id` and `counter` field values combined as a single integer.
-    pub const fn node_ctr(self) -> u32 {
-        self.0 as u32 & MAX_NODE_CTR
-    }
-
-    /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any argument is out of the valid value range.
-    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
-        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
-        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
-        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        Self::try_from_u64(value)
     }
 }
 
@@ -170,11 +183,12 @@ impl From<Scru64Id> for u64 {
     }
 }
 
-impl TryFrom<u64> for Scru64Id {
-    type Error = ConversionError;
+impl TryFrom<i64> for Scru64Id {
+    type Error = RangeError<i64>;
 
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        Self::try_from_u64(value)
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        // cast negative numbers to so large numbers that try_from_u64 rejects
+        Self::try_from(value as u64).map_err(|_| RangeError { value })
     }
 }
 
@@ -184,50 +198,106 @@ impl From<Scru64Id> for i64 {
     }
 }
 
-impl TryFrom<i64> for Scru64Id {
-    type Error = ConversionError;
-
-    fn try_from(value: i64) -> Result<Self, Self::Error> {
-        // cast negative numbers to so large numbers that try_from_u64 rejects
-        Self::try_from(value as u64)
-    }
-}
-
-impl fmt::Display for Scru64Id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.encode())
-    }
-}
-
 impl str::FromStr for Scru64Id {
-    type Err = ConversionError;
+    type Err = ParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::try_from_str(value)
     }
 }
 
-/// An error converting a value into SCRU64 ID.
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum ConversionError {
-    /// Out of valid integer range.
-    OutOfRange,
-
-    /// Invalid length of string.
-    InvalidLength,
-
-    /// Invalid digit char found.
-    InvalidDigit,
+impl fmt::Display for Scru64Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.encode().as_str(), f)
+    }
 }
 
-impl fmt::Display for ConversionError {
+/// An error converting an integer into a SCRU64 ID.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RangeError<T> {
+    value: T,
+}
+
+impl<T: fmt::Display> fmt::Display for RangeError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("could not convert to SCRU64 ID: ")?;
-        match self {
-            Self::OutOfRange => f.write_str("out of valid integer range"),
-            Self::InvalidLength => f.write_str("invalid length of string"),
-            Self::InvalidDigit => f.write_str("invalid digit char found"),
+        write!(
+            f,
+            "could not convert integer to SCRU64 ID: `{}` out of range: {}",
+            any::type_name::<T>(),
+            self.value
+        )
+    }
+}
+
+/// An error parsing an invalid string representation of SCRU64 ID.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParseError {
+    kind: ParseErrorKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ParseErrorKind {
+    Length {
+        n_bytes: usize,
+    },
+    Digit {
+        /// Holds the invalid character as a UTF-8 byte array to work in the const context.
+        utf8_char: [u8; 4],
+        position: usize,
+    },
+}
+
+impl ParseError {
+    /// Creates an "invalid length" error from the actual length.
+    const fn invalid_length(n_bytes: usize) -> Self {
+        Self {
+            kind: ParseErrorKind::Length { n_bytes },
+        }
+    }
+
+    /// Creates an "invalid digit" error from the entire string and the position of invalid digit.
+    const fn invalid_digit(src: &str, position: usize) -> Self {
+        const fn is_char_boundary(utf8_bytes: &[u8], index: usize) -> bool {
+            match index {
+                0 => true,
+                i if i < utf8_bytes.len() => (utf8_bytes[i] as i8) >= -64,
+                _ => index == utf8_bytes.len(),
+            }
+        }
+
+        let bs = src.as_bytes();
+        assert!(is_char_boundary(bs, position));
+        let mut utf8_char = [bs[position], 0, 0, 0];
+
+        let mut i = 1;
+        while !is_char_boundary(bs, position + i) {
+            utf8_char[i] = bs[position + i];
+            i += 1;
+        }
+
+        Self {
+            kind: ParseErrorKind::Digit {
+                utf8_char,
+                position,
+            },
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "could not parse string as SCRU64 ID: ")?;
+        match self.kind {
+            ParseErrorKind::Length { n_bytes } => {
+                write!(f, "invalid length: {} bytes (expected 12)", n_bytes)
+            }
+            ParseErrorKind::Digit {
+                utf8_char,
+                position,
+            } => {
+                let chr = str::from_utf8(&utf8_char).unwrap().chars().next().unwrap();
+                write!(f, "invalid digit '{}' at {}", chr.escape_debug(), position)
+            }
         }
     }
 }
@@ -235,10 +305,12 @@ impl fmt::Display for ConversionError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{ConversionError, Scru64Id};
+    use super::{ParseError, RangeError, Scru64Id};
+
+    use std::{error, fmt};
 
     impl TryFrom<String> for Scru64Id {
-        type Error = ConversionError;
+        type Error = ParseError;
 
         fn try_from(value: String) -> Result<Self, Self::Error> {
             value.parse()
@@ -251,19 +323,22 @@ mod std_ext {
         }
     }
 
-    impl std::error::Error for ConversionError {}
+    impl<T: fmt::Debug + fmt::Display> error::Error for RangeError<T> {}
+
+    impl error::Error for ParseError {}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{test_cases::TEST_CASES, Scru64Id};
+    use super::Scru64Id;
+    use crate::test_cases::EXAMPLE_IDS;
 
     /// Supports equality comparison.
     #[test]
     fn eq() {
         #[cfg(feature = "std")]
         let hash = {
-            use core::hash::{BuildHasher, Hash, Hasher};
+            use std::hash::{BuildHasher, Hash, Hasher};
             let s = std::collections::hash_map::RandomState::new();
             move |value: Scru64Id| {
                 let mut hasher = s.build_hasher();
@@ -272,8 +347,8 @@ mod tests {
             }
         };
 
-        let mut prev = Scru64Id::const_from_u64(TEST_CASES.last().unwrap().num);
-        for e in TEST_CASES {
+        let mut prev = Scru64Id::const_from_u64(EXAMPLE_IDS.last().unwrap().num);
+        for e in EXAMPLE_IDS {
             let curr = Scru64Id::const_from_u64(e.num);
             let twin = Scru64Id::const_from_u64(e.num);
 
@@ -292,6 +367,8 @@ mod tests {
 
             #[cfg(feature = "std")]
             {
+                assert_eq!(curr.to_string(), twin.to_string());
+                assert_ne!(curr.to_string(), prev.to_string());
                 assert_eq!(hash(curr), hash(twin));
                 assert_ne!(hash(curr), hash(prev));
             }
@@ -303,11 +380,12 @@ mod tests {
     /// Supports ordering comparison.
     #[test]
     fn ord() {
-        let mut cases = TEST_CASES.to_vec();
+        let mut cases = EXAMPLE_IDS.to_vec();
         cases.sort_by_key(|e| e.num);
 
-        let mut prev = Scru64Id::const_from_u64(cases[0].num);
-        for e in cases.iter().skip(1) {
+        let mut iter = cases.iter();
+        let mut prev = Scru64Id::const_from_u64(iter.next().unwrap().num);
+        while let Some(e) = iter.next() {
             let curr = Scru64Id::const_from_u64(e.num);
 
             assert!(prev < curr);
@@ -316,6 +394,8 @@ mod tests {
             assert!(curr > prev);
             assert!(curr >= prev);
 
+            assert!(prev.to_u64() < curr.to_u64());
+
             prev = curr;
         }
     }
@@ -323,7 +403,7 @@ mod tests {
     /// Converts to various types.
     #[test]
     fn convert_to() {
-        for e in TEST_CASES {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
 
             assert_eq!(x.to_u64(), e.num);
@@ -337,6 +417,9 @@ mod tests {
             {
                 assert_eq!(x.to_string(), e.text);
                 assert_eq!(String::from(x), e.text);
+                assert_eq!(format!("{}", x), format!("{}", e.text));
+                assert_eq!(format!("{:016}", x), format!("{:016}", e.text));
+                assert_eq!(format!("{:-^024}", x), format!("{:-^024}", e.text));
             }
         }
     }
@@ -344,7 +427,7 @@ mod tests {
     /// Converts from various types.
     #[test]
     fn convert_from() {
-        for e in TEST_CASES {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
 
             assert_eq!(x, (e.num as u64).try_into().unwrap());
@@ -431,7 +514,7 @@ mod serde_support {
         }
 
         fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
-            value.parse().map_err(de::Error::custom)
+            Self::Value::try_from_str(value).map_err(de::Error::custom)
         }
 
         fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
@@ -447,9 +530,10 @@ mod serde_support {
     #[cfg(test)]
     #[test]
     fn test() {
+        use crate::test_cases::EXAMPLE_IDS;
         use serde_test::{Configure, Token};
 
-        for e in super::test_cases::TEST_CASES {
+        for e in EXAMPLE_IDS {
             let x = Scru64Id::const_from_u64(e.num);
             serde_test::assert_tokens(&x.readable(), &[Token::Str(e.text)]);
             serde_test::assert_tokens(&x.compact(), &[Token::U64(e.num)]);
@@ -461,162 +545,4 @@ mod serde_support {
             serde_test::assert_de_tokens(&x.compact(), &[Token::I64(e.num as i64)]);
         }
     }
-}
-
-#[cfg(test)]
-mod test_cases {
-    #[derive(Clone, Eq, PartialEq, Debug)]
-    pub struct PreparedCase {
-        pub text: &'static str,
-        pub num: u64,
-        pub timestamp: u64,
-        pub node_ctr: u32,
-    }
-
-    pub const TEST_CASES: &[PreparedCase] = &[
-        PreparedCase {
-            text: "000000000000",
-            num: 0x0000000000000000,
-            timestamp: 0,
-            node_ctr: 0,
-        },
-        PreparedCase {
-            text: "00000009zldr",
-            num: 0x0000000000ffffff,
-            timestamp: 0,
-            node_ctr: 16777215,
-        },
-        PreparedCase {
-            text: "zzzzzzzq0em8",
-            num: 0x41c21cb8e0000000,
-            timestamp: 282429536480,
-            node_ctr: 0,
-        },
-        PreparedCase {
-            text: "zzzzzzzzzzzz",
-            num: 0x41c21cb8e0ffffff,
-            timestamp: 282429536480,
-            node_ctr: 16777215,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cq",
-            num: 0x0186d52bbe2a635a,
-            timestamp: 6557084606,
-            node_ctr: 2777946,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cr",
-            num: 0x0186d52bbe2a635b,
-            timestamp: 6557084606,
-            node_ctr: 2777947,
-        },
-        PreparedCase {
-            text: "0u375nxqh5cs",
-            num: 0x0186d52bbe2a635c,
-            timestamp: 6557084606,
-            node_ctr: 2777948,
-        },
-        PreparedCase {
-            text: "0u375nxqh5ct",
-            num: 0x0186d52bbe2a635d,
-            timestamp: 6557084606,
-            node_ctr: 2777949,
-        },
-        PreparedCase {
-            text: "0u375ny0glr0",
-            num: 0x0186d52bbf2a4a1c,
-            timestamp: 6557084607,
-            node_ctr: 2771484,
-        },
-        PreparedCase {
-            text: "0u375ny0glr1",
-            num: 0x0186d52bbf2a4a1d,
-            timestamp: 6557084607,
-            node_ctr: 2771485,
-        },
-        PreparedCase {
-            text: "0u375ny0glr2",
-            num: 0x0186d52bbf2a4a1e,
-            timestamp: 6557084607,
-            node_ctr: 2771486,
-        },
-        PreparedCase {
-            text: "0u375ny0glr3",
-            num: 0x0186d52bbf2a4a1f,
-            timestamp: 6557084607,
-            node_ctr: 2771487,
-        },
-        PreparedCase {
-            text: "jdsf1we3ui4f",
-            num: 0x2367c8dfb2e6d23f,
-            timestamp: 152065073074,
-            node_ctr: 15127103,
-        },
-        PreparedCase {
-            text: "j0afcjyfyi98",
-            num: 0x22b86eaad6b2f7ec,
-            timestamp: 149123148502,
-            node_ctr: 11728876,
-        },
-        PreparedCase {
-            text: "ckzyfc271xsn",
-            num: 0x16fc214296b29057,
-            timestamp: 98719318678,
-            node_ctr: 11702359,
-        },
-        PreparedCase {
-            text: "t0vgc4c4b18n",
-            num: 0x3504295badc14f07,
-            timestamp: 227703085997,
-            node_ctr: 12668679,
-        },
-        PreparedCase {
-            text: "mwcrtcubk7bp",
-            num: 0x29d3c7553e748515,
-            timestamp: 179646715198,
-            node_ctr: 7636245,
-        },
-        PreparedCase {
-            text: "g9ye86pgplu7",
-            num: 0x1dbb24363718aecf,
-            timestamp: 127693764151,
-            node_ctr: 1617615,
-        },
-        PreparedCase {
-            text: "qmez19t9oeir",
-            num: 0x30a122fef7cd6c83,
-            timestamp: 208861855479,
-            node_ctr: 13462659,
-        },
-        PreparedCase {
-            text: "d81r595fq52m",
-            num: 0x18278838f0660f2e,
-            timestamp: 103742454000,
-            node_ctr: 6688558,
-        },
-        PreparedCase {
-            text: "v0rbps7ay8ks",
-            num: 0x38a9e683bb4425ec,
-            timestamp: 243368625083,
-            node_ctr: 4466156,
-        },
-        PreparedCase {
-            text: "z0jndjt42op2",
-            num: 0x3ff596748ea77186,
-            timestamp: 274703217806,
-            node_ctr: 10973574,
-        },
-        PreparedCase {
-            text: "f2bembkd4zrb",
-            num: 0x1b844eb5d1aebb07,
-            timestamp: 118183867857,
-            node_ctr: 11451143,
-        },
-        PreparedCase {
-            text: "mkg0fd5p76pp",
-            num: 0x29391373ab449abd,
-            timestamp: 177051235243,
-            node_ctr: 4496061,
-        },
-    ];
 }

@@ -15,11 +15,11 @@
 //!
 //! // generate a new identifier object
 //! let x = scru64::new();
-//! println!("{x}"); // e.g. "0u2r85hm2pt3"
+//! println!("{x}"); // e.g., "0u2r85hm2pt3"
 //! println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 //!
 //! // generate a textual representation directly
-//! println!("{}", scru64::new_string()); // e.g. "0u2r85hm2pt4"
+//! println!("{}", scru64::new_string()); // e.g., "0u2r85hm2pt4"
 //! ```
 //!
 //! See [SCRU64 Specification] for details.
@@ -35,68 +35,54 @@
 //!
 //! Default features:
 //!
-//! - `std` enables the primary [`new()`] and [`new_string()`] functions and configures
-//!   [`generator::Scru64Generator`] with the system clock. Without `std`, this crate
-//!   provides limited functionality available under `no_std` environments.
+//! - `std` integrates the library with, among others, the system clock to draw
+//!   current timestamps. Without `std`, this crate provides limited functionality
+//!   available under `no_std` environments.
+//! - `global_gen` (implies `std`) enables the primary [`new()`] and [`new_string()`]
+//!   functions and the process-wide global generator under the hood.
 //!
 //! Optional features:
 //!
 //! - `serde` enables serialization/deserialization via serde.
-//! - `tokio` enables the [`async_tokio::new()`] and [`async_tokio::new_string()`]
-//!   functions, the non-blocking counterpart of `new()` and `new_string()`.
+//! - `tokio` (together with `global_gen`) enables the [`async_tokio::new()`] and
+//!   [`async_tokio::new_string()`] functions, the non-blocking counterpart of [`new()`]
+//!   and [`new_string()`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod generator;
+
 mod identifier;
+pub use identifier::{ParseError, RangeError, Scru64Id};
 
-pub use identifier::{ConversionError, Scru64Id};
+#[cfg(feature = "global_gen")]
+pub use shortcut::{new, new_string};
 
-#[cfg(feature = "std")]
-pub use global_gen::{new, new_string};
+#[cfg(all(feature = "global_gen", feature = "tokio"))]
+pub use shortcut::async_tokio;
 
-#[cfg(all(feature = "std", feature = "tokio"))]
-pub use global_gen::async_tokio;
+#[cfg(test)]
+mod test_cases;
 
 /// The total size in bits of the `node_id` and `counter` fields.
 const NODE_CTR_SIZE: u8 = 24;
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-mod global_gen {
-    use std::{env, sync::Mutex, thread, time};
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
+mod shortcut {
+    use std::{thread, time};
 
-    use once_cell::sync::Lazy;
-
-    use crate::{generator::Scru64Generator, Scru64Id};
-
-    static GLOBAL_GENERATOR: Lazy<Mutex<Scru64Generator>> = Lazy::new(|| {
-        let g = match env::var("SCRU64_NODE_SPEC") {
-            Err(err) => {
-                panic!("scru64: could not read config from SCRU64_NODE_SPEC env var: {err}")
-            }
-            Ok(node_spec) => Scru64Generator::parse(&node_spec).unwrap_or_else(|err| {
-                panic!("scru64: could not initialize global generator: {err}")
-            }),
-        };
-        Mutex::new(g)
-    });
-
-    fn generate_or_abort() -> Option<Scru64Id> {
-        GLOBAL_GENERATOR
-            .lock()
-            .unwrap_or_else(|err| panic!("scru64: could not lock global generator: {err}"))
-            .generate()
-    }
+    use crate::{generator::GlobalGenerator, Scru64Id};
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
     /// Generates a new SCRU64 ID object using the global generator.
     ///
-    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
-    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
-    /// (e.g., `"42/8"`, `"12345/16"`).
+    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable by default, and it panics if it fails to read a well-formed node spec
+    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
+    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_tokio::new`]
@@ -104,10 +90,10 @@ mod global_gen {
     ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the environment variable.
+    /// Panics if the global generator is not properly configured.
     pub fn new() -> Scru64Id {
         loop {
-            if let Some(value) = generate_or_abort() {
+            if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
                 thread::sleep(DELAY);
@@ -118,9 +104,10 @@ mod global_gen {
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
     ///
-    /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC` environment
-    /// variable. A node spec string consists of `node_id` and `node_id_size` separated by a slash
-    /// (e.g., `"42/8"`, `"12345/16"`).
+    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable by default, and it panics if it fails to read a well-formed node spec
+    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
+    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see
@@ -128,33 +115,48 @@ mod global_gen {
     ///
     /// # Panics
     ///
-    /// Panics if the global generator is not properly configured through the environment variable.
+    /// Panics if the global generator is not properly configured.
     pub fn new_string() -> String {
         new().into()
+    }
+
+    /// Generates 100k monotonically increasing IDs.
+    #[cfg(test)]
+    #[test]
+    fn test() {
+        std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+
+        let mut prev = new_string();
+        for _ in 0..100_000 {
+            let curr = new_string();
+            assert!(prev < curr);
+            prev = curr;
+        }
     }
 
     /// Non-blocking global generator functions using `tokio`.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub mod async_tokio {
-        use super::{generate_or_abort, Scru64Id, DELAY};
+        use super::{GlobalGenerator, Scru64Id, DELAY};
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
-        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
-        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable by default, and it panics if it fails to read a well-formed node
+        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
+        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
+        /// string format.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
         ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the environment
-        /// variable.
+        /// Panics if the global generator is not properly configured.
         pub async fn new() -> Scru64Id {
             loop {
-                if let Some(value) = generate_or_abort() {
+                if let Some(value) = GlobalGenerator.generate() {
                     break value;
                 } else {
                     tokio::time::sleep(DELAY).await;
@@ -165,24 +167,39 @@ mod global_gen {
         /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using
         /// the global generator.
         ///
-        /// The global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable. A node spec string consists of `node_id` and `node_id_size`
-        /// separated by a slash (e.g., `"42/8"`, `"12345/16"`).
+        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
+        /// environment variable by default, and it panics if it fails to read a well-formed node
+        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
+        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
+        /// string format.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
         ///
         /// # Panics
         ///
-        /// Panics if the global generator is not properly configured through the environment
-        /// variable.
+        /// Panics if the global generator is not properly configured.
         pub async fn new_string() -> String {
             loop {
-                if let Some(value) = generate_or_abort() {
+                if let Some(value) = GlobalGenerator.generate() {
                     break value.into();
                 } else {
                     tokio::time::sleep(DELAY).await;
                 }
+            }
+        }
+
+        /// Generates 100k monotonically increasing IDs.
+        #[cfg(test)]
+        #[tokio::test]
+        async fn test() {
+            std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+
+            let mut prev = new_string().await;
+            for _ in 0..100_000 {
+                let curr = new_string().await;
+                assert!(prev < curr);
+                prev = curr;
             }
         }
     }
