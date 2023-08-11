@@ -37,8 +37,31 @@ impl GlobalGenerator {
         .expect("scru64: could not lock global generator")
     }
 
-    /// Configures the global generator with a node spec, discarding the existing configuration if
-    /// any.
+    /// Configures the global generator with the node spec read from the `SCRU64_NODE_SPEC`
+    /// environment variable.
+    ///
+    /// This method returns an error if it fails to read a well-formed node spec string from the
+    /// environment variable or, otherwise, configures the global generator and discards the
+    /// existing configuration (if any).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use scru64::generator::GlobalGenerator;
+    ///
+    /// std::env::set_var("SCRU64_NODE_SPEC", "");
+    /// assert!(GlobalGenerator.configure_from_env().is_err());
+    ///
+    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+    /// assert!(GlobalGenerator.configure_from_env().is_ok());
+    /// ```
+    pub fn configure_from_env(&self) -> Result<(), impl error::Error> {
+        self.configure(read_env_var("SCRU64_NODE_SPEC")?);
+        Ok::<(), EnvVarError<'static>>(())
+    }
+
+    /// Configures the global generator with a node spec, discarding the existing configuration (if
+    /// any).
     ///
     /// # Examples
     ///
