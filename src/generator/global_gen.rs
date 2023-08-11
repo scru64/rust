@@ -1,4 +1,4 @@
-use std::{env, sync};
+use std::{env, error, fmt, sync};
 
 use super::{NodeSpec, Scru64Generator, Scru64Id};
 
@@ -26,27 +26,42 @@ pub struct GlobalGenerator;
 static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
 
 impl GlobalGenerator {
-    fn lock(&self) -> sync::MutexGuard<'_, Scru64Generator> {
+    fn lock(&self) -> sync::MutexGuard<'static, Scru64Generator> {
         G.get_or_init(|| {
-            let node_spec = env::var("SCRU64_NODE_SPEC")
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "scru64: could not read config from SCRU64_NODE_SPEC env var: {}",
-                        err
-                    )
-                })
-                .parse()
-                .unwrap_or_else(|err| {
-                    panic!("scru64: could not initialize global generator: {}", err)
-                });
+            use error::Error as _;
+            let node_spec = read_env_var("SCRU64_NODE_SPEC")
+                .unwrap_or_else(|err| panic!("scru64: {}: {}", err, err.source().unwrap()));
             sync::Mutex::new(Scru64Generator::new(node_spec))
         })
         .lock()
         .expect("scru64: could not lock global generator")
     }
 
-    /// Configures the global generator with a node spec, discarding the existing configuration if
-    /// any.
+    /// Configures the global generator with the node spec read from the `SCRU64_NODE_SPEC`
+    /// environment variable.
+    ///
+    /// This method returns an error if it fails to read a well-formed node spec string from the
+    /// environment variable or, otherwise, configures the global generator and discards the
+    /// existing configuration (if any).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use scru64::generator::GlobalGenerator;
+    ///
+    /// std::env::set_var("SCRU64_NODE_SPEC", "");
+    /// assert!(GlobalGenerator.configure_from_env().is_err());
+    ///
+    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+    /// assert!(GlobalGenerator.configure_from_env().is_ok());
+    /// ```
+    pub fn configure_from_env(&self) -> Result<(), impl error::Error> {
+        self.configure(read_env_var("SCRU64_NODE_SPEC")?);
+        Ok::<(), EnvVarError<'static>>(())
+    }
+
+    /// Configures the global generator with a node spec, discarding the existing configuration (if
+    /// any).
     ///
     /// # Examples
     ///
@@ -91,5 +106,38 @@ impl GlobalGenerator {
     /// Calls [`Scru64Generator::node_spec`] of the global generator.
     pub fn node_spec(&self) -> NodeSpec {
         self.lock().node_spec()
+    }
+}
+
+/// Reads the node spec from the environment variable.
+fn read_env_var(key: &str) -> Result<NodeSpec, EnvVarError> {
+    env::var(key)
+        .map_err(|err| EnvVarError {
+            key,
+            source: Box::new(err),
+        })?
+        .parse()
+        .map_err(|err| EnvVarError {
+            key,
+            source: Box::new(err),
+        })
+}
+
+/// An error reading the node spec from the environment variable.
+#[derive(Debug)]
+struct EnvVarError<'a> {
+    key: &'a str,
+    source: Box<dyn error::Error>,
+}
+
+impl<'a> fmt::Display for EnvVarError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "could not read config from {} env var", self.key)
+    }
+}
+
+impl<'a> error::Error for EnvVarError<'a> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(self.source.as_ref())
     }
 }

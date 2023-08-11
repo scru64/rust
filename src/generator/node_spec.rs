@@ -42,7 +42,7 @@ use super::Scru64Generator;
 /// );
 /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
 /// ```
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct NodeSpec {
     node_prev: Scru64Id,
     node_id_size: u8,
