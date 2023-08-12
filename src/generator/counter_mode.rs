@@ -23,7 +23,10 @@ pub trait CounterMode {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct RenewContext {
+    /// The `timestamp` value for the new counter.
     pub timestamp: u64,
+
+    /// The `node_id` of the generator.
     pub node_id: u32,
 }
 
