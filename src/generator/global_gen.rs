@@ -26,6 +26,8 @@ pub struct GlobalGenerator;
 static G: sync::OnceLock<sync::Mutex<Scru64Generator>> = sync::OnceLock::new();
 
 impl GlobalGenerator {
+    /// Acquires the lock for the global generator, initializing it based on the environment
+    /// variable if not yet initialized.
     fn lock(&self) -> sync::MutexGuard<'static, Scru64Generator> {
         G.get_or_init(|| {
             use error::Error as _;
@@ -37,57 +39,54 @@ impl GlobalGenerator {
         .expect("scru64: could not lock global generator")
     }
 
-    /// Configures the global generator with the node spec read from the `SCRU64_NODE_SPEC`
-    /// environment variable.
+    /// Initializes the global generator, if not initialized, with the node spec passed.
     ///
-    /// This method returns an error if it fails to read a well-formed node spec string from the
-    /// environment variable or, otherwise, configures the global generator and discards the
-    /// existing configuration (if any).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use scru64::generator::GlobalGenerator;
-    ///
-    /// std::env::set_var("SCRU64_NODE_SPEC", "");
-    /// assert!(GlobalGenerator.configure_from_env().is_err());
-    ///
-    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
-    /// assert!(GlobalGenerator.configure_from_env().is_ok());
-    /// ```
-    pub fn configure_from_env(&self) -> Result<(), impl error::Error> {
-        self.configure(read_env_var("SCRU64_NODE_SPEC")?);
-        Ok::<(), EnvVarError<'static>>(())
-    }
-
-    /// Configures the global generator with a node spec, discarding the existing configuration (if
-    /// any).
+    /// This method configures the global generator with the argument and returns `Ok` only when
+    /// the global generator is not yet initialized. Otherwise, it preserves the existing
+    /// configuration and returns `Err` wrapping the argument passed.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use scru64::generator::GlobalGenerator;
     ///
-    /// GlobalGenerator.configure("0xb00/12".parse()?);
+    /// let x = GlobalGenerator.initialize("0xb00/12".parse()?);
+    /// assert!(x.is_ok());
     /// assert_eq!(GlobalGenerator.node_id(), 0xb00);
     /// assert_eq!(GlobalGenerator.node_id_size(), 12);
     /// assert_eq!(GlobalGenerator.node_spec().to_string(), "2816/12");
     ///
-    /// GlobalGenerator.configure("0u2r85hm2pt3/16".parse()?);
-    /// assert_eq!(GlobalGenerator.node_id(), 11001);
-    /// assert_eq!(GlobalGenerator.node_id_size(), 16);
-    /// assert_eq!(GlobalGenerator.node_spec().to_string(), "0u2r85hm2pt3/16");
+    /// let y = GlobalGenerator.initialize("0u2r85hm2pt3/16".parse()?);
+    /// assert!(y.is_err());
+    /// assert_eq!(y.unwrap_err().to_string(), "0u2r85hm2pt3/16");
+    /// assert_eq!(GlobalGenerator.node_id(), 0xb00);
+    /// assert_eq!(GlobalGenerator.node_id_size(), 12);
+    /// assert_eq!(GlobalGenerator.node_spec().to_string(), "2816/12");
     /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
     /// ```
-    pub fn configure(&self, node_spec: NodeSpec) {
-        let mut g = Some(Scru64Generator::new(node_spec));
-        let mut lock = G
-            .get_or_init(|| sync::Mutex::new(g.take().unwrap()))
-            .lock()
-            .expect("scru64: could not lock global generator");
-        if let Some(g) = g {
-            // replace current one if get_or_init closure was not called
-            *lock = g;
+    ///
+    /// Use this method to substitute for the default panicking initializer to handle errors
+    /// gracefully.
+    ///
+    /// ```rust
+    /// use scru64::generator::GlobalGenerator;
+    ///
+    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+    ///
+    /// let node_spec = std::env::var("SCRU64_NODE_SPEC")?.parse()?;
+    /// assert!(GlobalGenerator.initialize(node_spec).is_ok());
+    ///
+    /// assert_eq!(GlobalGenerator.node_id(), 42);
+    /// assert_eq!(GlobalGenerator.node_id_size(), 8);
+    /// assert_eq!(GlobalGenerator.node_spec().to_string(), "42/8");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn initialize(&self, node_spec: NodeSpec) -> Result<(), NodeSpec> {
+        let mut wrap = Some(node_spec);
+        G.get_or_init(|| sync::Mutex::new(Scru64Generator::new(wrap.take().unwrap())));
+        match wrap {
+            None => Ok(()),
+            Some(node_spec) => Err(node_spec),
         }
     }
 
