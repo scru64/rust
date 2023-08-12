@@ -46,7 +46,6 @@ pub struct DefaultCounterMode {
 impl DefaultCounterMode {
     /// Creates a new instance with the size (in bits) of overflow guard bits.
     pub const fn new(overflow_guard_size: u8) -> Self {
-        assert!(overflow_guard_size < NODE_CTR_SIZE);
         Self {
             overflow_guard_size,
             rng: 0, // zero indicates uninitialized state
