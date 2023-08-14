@@ -275,18 +275,18 @@ mod tests {
             let parsed = e.node_spec.parse::<NodeSpec>().unwrap();
             assert_eq!(parsed.node_id(), e.node_id);
             assert_eq!(parsed.node_id_size(), e.node_id_size);
-            if let Some(p) = with_node_prev.node_prev() {
+            if let Some(p) = parsed.node_prev() {
                 assert_eq!(p, node_prev);
             }
             assert_eq!(parsed.node_prev_raw(), node_prev);
 
             #[cfg(feature = "std")]
             {
+                assert_eq!(with_node_prev.to_string(), e.canonical);
                 if e.spec_type.ends_with("_node_id") {
                     assert_eq!(with_node_id.to_string(), e.canonical);
                 }
                 assert_eq!(parsed.to_string(), e.canonical);
-                assert_eq!(with_node_prev.to_string(), e.canonical);
             }
         }
     }
