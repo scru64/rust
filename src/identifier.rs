@@ -85,12 +85,9 @@ impl Scru64Id {
     pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
         assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
         assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
-
-        // upper bound check is necessary when `timestamp` is at max
-        match Self::try_from_u64(timestamp << NODE_CTR_SIZE | node_ctr as u64) {
-            Ok(t) => t,
-            Err(_) => panic!("`timestamp` and `node_ctr` pair out of range"),
-        }
+        // no further check is necessary because `MAX_SCRU64_INT` happens to equal
+        // `MAX_TIMESTAMP << 24 | MAX_NODE_CTR`
+        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
     }
 
     /// Returns the `timestamp` field value.
@@ -480,6 +477,14 @@ mod tests {
         for e in cases {
             assert!(e.parse::<Scru64Id>().is_err());
         }
+    }
+
+    /// Rejects `MAX + 1` even if passed as pair of fields.
+    #[test]
+    #[should_panic]
+    fn from_parts_error() {
+        let max = 36u64.pow(12) - 1;
+        Scru64Id::from_parts(max >> 24, (max as u32 & 0xff_ffff) + 1);
     }
 }
 

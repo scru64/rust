@@ -23,7 +23,10 @@ pub trait CounterMode {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct RenewContext {
+    /// The `timestamp` value for the new counter.
     pub timestamp: u64,
+
+    /// The `node_id` of the generator.
     pub node_id: u32,
 }
 
@@ -43,7 +46,6 @@ pub struct DefaultCounterMode {
 impl DefaultCounterMode {
     /// Creates a new instance with the size (in bits) of overflow guard bits.
     pub const fn new(overflow_guard_size: u8) -> Self {
-        assert!(overflow_guard_size < NODE_CTR_SIZE);
         Self {
             overflow_guard_size,
             rng: 0, // zero indicates uninitialized state
