@@ -61,7 +61,7 @@ impl DefaultCounterMode {
         #[cfg(not(feature = "std"))]
         let addr = (self as *const Self) as u64;
 
-        addr ^ ((context.timestamp << NODE_CTR_SIZE) | ((context.node_id as u64) << counter_size))
+        addr ^ ((context.timestamp << NODE_CTR_SIZE) | (u64::from(context.node_id) << counter_size))
     }
 }
 

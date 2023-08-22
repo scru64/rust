@@ -150,7 +150,7 @@ impl Scru64Id {
     /// let x = "0u2r87q2rol5".parse::<Scru64Id>()?;
     /// let y = x.encode();
     /// assert_eq!(y, "0u2r87q2rol5");
-    /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
+    /// assert_eq!(format!("{}", y), "0u2r87q2rol5");
     /// # Ok::<(), scru64::ParseError>(())
     /// ```
     pub const fn encode(self) -> FStr<12> {
