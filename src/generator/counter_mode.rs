@@ -92,7 +92,7 @@ impl CounterMode for DefaultCounterMode {
 /// certain low probability.
 #[cfg(test)]
 #[test]
-fn test_that_may_fail_at_low_probability() {
+fn test_default_counter_mode() {
     const N: usize = 4096;
 
     // set margin based on binom dist 99.999999% confidence interval
@@ -114,6 +114,7 @@ fn test_that_may_fail_at_low_probability() {
                     *e += n & 1;
                     n >>= 1;
                 }
+                assert_eq!(n, 0);
             }
 
             let filled = counter_size.saturating_sub(overflow_guard_size) as usize;

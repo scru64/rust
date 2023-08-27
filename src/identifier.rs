@@ -397,6 +397,7 @@ mod tests {
             assert!(curr >= prev);
 
             assert!(prev.to_u64() < curr.to_u64());
+            assert!(prev.encode().as_str() < curr.encode().as_str());
 
             prev = curr;
         }
