@@ -58,7 +58,7 @@ impl Scru64Generator {
         if node_spec.node_id_size() < 20 {
             Self::with_counter_mode(node_spec, DefaultCounterMode::new(0))
         } else {
-            // reserve one overflow guard bit if `counter_size` is four or less
+            // reserve one overflow guard bit if `counter_size` is very small
             Self::with_counter_mode(node_spec, DefaultCounterMode::new(1))
         }
     }
