@@ -344,7 +344,7 @@ impl fmt::Display for ParseError {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_ext {
-    use super::{ParseError, RangeError, Scru64Id};
+    use super::{ParseError, PartsError, RangeError, Scru64Id};
 
     use std::{error, fmt};
 
@@ -363,6 +363,8 @@ mod std_ext {
     }
 
     impl<T: fmt::Debug + fmt::Display> error::Error for RangeError<T> {}
+
+    impl error::Error for PartsError {}
 
     impl error::Error for ParseError {}
 }
