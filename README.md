@@ -18,7 +18,7 @@ std::env::set_var("SCRU64_NODE_SPEC", "42/8");
 
 // generate a new identifier object
 let x = scru64::new();
-println!("{x}"); // e.g., "0u2r85hm2pt3"
+println!("{}", x); // e.g., "0u2r85hm2pt3"
 println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 
 // generate a textual representation directly

@@ -51,7 +51,7 @@ impl Scru64Id {
     ///
     /// # Panics
     ///
-    /// Panics if the argument is out of the valid value range.
+    /// Panics if the argument is larger than `36^12 - 1`.
     pub const fn const_from_u64(value: u64) -> Self {
         match Self::try_from_u64(value) {
             Ok(t) => t,
@@ -63,7 +63,7 @@ impl Scru64Id {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the argument is out of the valid value range.
+    /// Returns `Err` if the argument is larger than `36^12 - 1`.
     const fn try_from_u64(value: u64) -> Result<Self, RangeError<u64>> {
         if value <= Self::MAX.0 {
             Ok(Self(value))
@@ -79,15 +79,21 @@ impl Scru64Id {
 
     /// Creates a value from the `timestamp` and the combined `node_ctr` field value.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if any argument is out of the valid value range.
-    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Self {
-        assert!(timestamp <= MAX_TIMESTAMP, "`timestamp` out of range");
-        assert!(node_ctr <= MAX_NODE_CTR, "`node_ctr` out of range");
-        // no further check is necessary because `MAX_SCRU64_INT` happens to equal
-        // `MAX_TIMESTAMP << 24 | MAX_NODE_CTR`
-        Self(timestamp << NODE_CTR_SIZE | node_ctr as u64)
+    /// Returns `Err` if any argument is larger than their respective maximum value
+    /// (`36^12 / 2^24 - 1` and `2^24 - 1`, respectively).
+    pub const fn from_parts(timestamp: u64, node_ctr: u32) -> Result<Self, PartsError> {
+        if timestamp <= MAX_TIMESTAMP && node_ctr <= MAX_NODE_CTR {
+            // no further check is necessary because `MAX_SCRU64_INT` happens to equal
+            // `MAX_TIMESTAMP << 24 | MAX_NODE_CTR`
+            Ok(Self(timestamp << NODE_CTR_SIZE | node_ctr as u64))
+        } else {
+            Err(PartsError {
+                timestamp,
+                node_ctr,
+            })
+        }
     }
 
     /// Returns the `timestamp` field value.
@@ -150,7 +156,7 @@ impl Scru64Id {
     /// let x = "0u2r87q2rol5".parse::<Scru64Id>()?;
     /// let y = x.encode();
     /// assert_eq!(y, "0u2r87q2rol5");
-    /// assert_eq!(format!("{y}"), "0u2r87q2rol5");
+    /// assert_eq!(format!("{}", y), "0u2r87q2rol5");
     /// # Ok::<(), scru64::ParseError>(())
     /// ```
     pub const fn encode(self) -> FStr<12> {
@@ -228,6 +234,37 @@ impl<T: fmt::Display> fmt::Display for RangeError<T> {
             any::type_name::<T>(),
             self.value
         )
+    }
+}
+
+/// An error passing invalid arguments to [`Scru64Id::from_parts()`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PartsError {
+    timestamp: u64,
+    node_ctr: u32,
+}
+
+impl PartsError {
+    /// Returns `true` if `timestamp` is within the valid range.
+    pub fn test_timestamp(&self) -> bool {
+        self.timestamp <= MAX_TIMESTAMP
+    }
+
+    /// Returns `true` if `node_ctr` is within the valid range.
+    pub fn test_node_ctr(&self) -> bool {
+        self.node_ctr <= MAX_NODE_CTR
+    }
+}
+
+impl fmt::Display for PartsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "could not create SCRU64 ID from parts: ")?;
+        match (self.test_timestamp(), self.test_node_ctr()) {
+            (false, false) => write!(f, "`timestamp` and `node_ctr` out of range"),
+            (false, true) => write!(f, "`timestamp` out of range"),
+            (true, false) => write!(f, "`node_ctr` out of range"),
+            (true, true) => unreachable!(),
+        }
     }
 }
 
@@ -397,6 +434,7 @@ mod tests {
             assert!(curr >= prev);
 
             assert!(prev.to_u64() < curr.to_u64());
+            assert!(prev.encode().as_str() < curr.encode().as_str());
 
             prev = curr;
         }
@@ -435,7 +473,7 @@ mod tests {
             assert_eq!(x, (e.num as u64).try_into().unwrap());
             assert_eq!(x, (e.num as i64).try_into().unwrap());
             assert_eq!(x, e.text.parse().unwrap());
-            assert_eq!(x, Scru64Id::from_parts(e.timestamp, e.node_ctr));
+            assert_eq!(x, Scru64Id::from_parts(e.timestamp, e.node_ctr).unwrap());
 
             #[cfg(feature = "std")]
             {
@@ -481,10 +519,9 @@ mod tests {
 
     /// Rejects `MAX + 1` even if passed as pair of fields.
     #[test]
-    #[should_panic]
     fn from_parts_error() {
         let max = 36u64.pow(12) - 1;
-        Scru64Id::from_parts(max >> 24, (max as u32 & 0xff_ffff) + 1);
+        assert!(Scru64Id::from_parts(max >> 24, (max as u32 & 0xff_ffff) + 1).is_err());
     }
 }
 

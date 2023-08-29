@@ -15,7 +15,7 @@
 //!
 //! // generate a new identifier object
 //! let x = scru64::new();
-//! println!("{x}"); // e.g., "0u2r85hm2pt3"
+//! println!("{}", x); // e.g., "0u2r85hm2pt3"
 //! println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 //!
 //! // generate a textual representation directly
@@ -54,7 +54,7 @@
 pub mod generator;
 
 mod identifier;
-pub use identifier::{ParseError, RangeError, Scru64Id};
+pub use identifier::{ParseError, PartsError, RangeError, Scru64Id};
 
 #[cfg(feature = "global_gen")]
 pub use shortcut::{new, new_string};

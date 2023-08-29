@@ -58,7 +58,7 @@ impl Scru64Generator {
         if node_spec.node_id_size() < 20 {
             Self::with_counter_mode(node_spec, DefaultCounterMode::new(0))
         } else {
-            // reserve one overflow guard bit if `counter_size` is four or less
+            // reserve one overflow guard bit if `counter_size` is very small
             Self::with_counter_mode(node_spec, DefaultCounterMode::new(1))
         }
     }
@@ -123,7 +123,7 @@ impl<C: CounterMode> Scru64Generator<C> {
         } else {
             // reset state and resume
             let timestamp = unix_ts_ms >> 8;
-            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp)).unwrap();
             self.prev
         }
     }
@@ -154,19 +154,20 @@ impl<C: CounterMode> Scru64Generator<C> {
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
-            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp)).unwrap();
         } else if timestamp + allowance >= prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
             let counter_mask = (1u32 << self.counter_size) - 1;
             if (prev_node_ctr & counter_mask) < counter_mask {
-                self.prev = Scru64Id::from_parts(prev_timestamp, prev_node_ctr + 1);
+                self.prev = Scru64Id::from_parts(prev_timestamp, prev_node_ctr + 1).unwrap();
             } else {
                 // increment timestamp at counter overflow
                 self.prev = Scru64Id::from_parts(
                     prev_timestamp + 1,
                     self.renew_node_ctr(prev_timestamp + 1),
-                );
+                )
+                .expect("`timestamp` and `counter` reached max; no more ID available");
             }
         } else {
             // abort if clock went backwards to unbearable extent
@@ -214,7 +215,7 @@ mod tests {
     use super::{NodeSpec, Scru64Generator, Scru64Id};
     use crate::test_cases::EXAMPLE_NODE_SPECS;
 
-    fn test_consecutive_pair(first: Scru64Id, second: Scru64Id) {
+    fn assert_consecutive(first: Scru64Id, second: Scru64Id) {
         assert!(first < second);
         if first.timestamp() == second.timestamp() {
             assert_eq!(first.node_ctr() + 1, second.node_ctr());
@@ -240,7 +241,7 @@ mod tests {
             for _ in 0..N_LOOPS {
                 ts += 16;
                 let curr = g.generate_or_reset_core(ts, ALLOWANCE);
-                test_consecutive_pair(prev, curr);
+                assert_consecutive(prev, curr);
                 assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
                 assert!((curr.node_ctr() >> counter_size) == e.node_id);
 
@@ -253,7 +254,7 @@ mod tests {
             for _ in 0..N_LOOPS {
                 ts -= 16;
                 let curr = g.generate_or_reset_core(ts, ALLOWANCE);
-                test_consecutive_pair(prev, curr);
+                assert_consecutive(prev, curr);
                 assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
                 assert!((curr.node_ctr() >> counter_size) == e.node_id);
 
@@ -292,7 +293,7 @@ mod tests {
             for _ in 0..N_LOOPS {
                 ts += 16;
                 let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
-                test_consecutive_pair(prev, curr);
+                assert_consecutive(prev, curr);
                 assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
                 assert!((curr.node_ctr() >> counter_size) == e.node_id);
 
@@ -305,7 +306,7 @@ mod tests {
             for _ in 0..N_LOOPS {
                 ts -= 16;
                 let curr = g.generate_or_abort_core(ts, ALLOWANCE).unwrap();
-                test_consecutive_pair(prev, curr);
+                assert_consecutive(prev, curr);
                 assert!((curr.timestamp() - (ts >> 8)) < (ALLOWANCE >> 8));
                 assert!((curr.node_ctr() >> counter_size) == e.node_id);
 

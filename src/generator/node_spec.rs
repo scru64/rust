@@ -97,10 +97,13 @@ impl NodeSpec {
         if 0 < node_id_size && node_id_size < NODE_CTR_SIZE {
             if node_id < (1 << node_id_size) {
                 let counter_size = NODE_CTR_SIZE - node_id_size;
-                Ok(Self {
-                    node_prev: Scru64Id::from_parts(0, node_id << counter_size),
-                    node_id_size,
-                })
+                match Scru64Id::from_parts(0, node_id << counter_size) {
+                    Ok(node_prev) => Ok(Self {
+                        node_prev,
+                        node_id_size,
+                    }),
+                    Err(_) => unreachable!(),
+                }
             } else {
                 Err(NodeSpecError::NodeIdRange {
                     node_id,
@@ -315,6 +318,7 @@ mod tests {
             "1024/8",
             "0000000000001/8",
             "1/0016",
+            "42/800",
         ];
 
         for e in cases {
