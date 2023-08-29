@@ -54,7 +54,7 @@
 pub mod generator;
 
 mod identifier;
-pub use identifier::{ParseError, RangeError, Scru64Id};
+pub use identifier::{ParseError, PartsError, RangeError, Scru64Id};
 
 #[cfg(feature = "global_gen")]
 pub use shortcut::{new, new_string};

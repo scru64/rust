@@ -123,7 +123,7 @@ impl<C: CounterMode> Scru64Generator<C> {
         } else {
             // reset state and resume
             let timestamp = unix_ts_ms >> 8;
-            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp)).unwrap();
             self.prev
         }
     }
@@ -154,19 +154,20 @@ impl<C: CounterMode> Scru64Generator<C> {
 
         let prev_timestamp = self.prev.timestamp();
         if timestamp > prev_timestamp {
-            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp));
+            self.prev = Scru64Id::from_parts(timestamp, self.renew_node_ctr(timestamp)).unwrap();
         } else if timestamp + allowance >= prev_timestamp {
             // go on with previous timestamp if new one is not much smaller
             let prev_node_ctr = self.prev.node_ctr();
             let counter_mask = (1u32 << self.counter_size) - 1;
             if (prev_node_ctr & counter_mask) < counter_mask {
-                self.prev = Scru64Id::from_parts(prev_timestamp, prev_node_ctr + 1);
+                self.prev = Scru64Id::from_parts(prev_timestamp, prev_node_ctr + 1).unwrap();
             } else {
                 // increment timestamp at counter overflow
                 self.prev = Scru64Id::from_parts(
                     prev_timestamp + 1,
                     self.renew_node_ctr(prev_timestamp + 1),
-                );
+                )
+                .expect("`timestamp` and `counter` reached max; no more ID available");
             }
         } else {
             // abort if clock went backwards to unbearable extent
