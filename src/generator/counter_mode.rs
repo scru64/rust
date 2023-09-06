@@ -93,10 +93,10 @@ impl CounterMode for DefaultCounterMode {
 #[cfg(test)]
 #[test]
 fn test_default_counter_mode() {
-    const N: usize = 4096;
+    const N_LOOPS: usize = 4096;
 
     // set margin based on binom dist 99.999999% confidence interval
-    let margin = 5.730729 * (0.5 * 0.5 / N as f64).sqrt();
+    let margin = 5.730729 * (0.5 * 0.5 / N_LOOPS as f64).sqrt();
 
     let context = RenewContext {
         timestamp: 0x0123_4567_89ab,
@@ -108,7 +108,7 @@ fn test_default_counter_mode() {
             let mut counts_by_pos = [0u32; NODE_CTR_SIZE as usize];
 
             let mut c = DefaultCounterMode::new(overflow_guard_size);
-            for _ in 0..N {
+            for _ in 0..N_LOOPS {
                 let mut n = c.renew(counter_size, &context);
                 for e in counts_by_pos.iter_mut() {
                     *e += n & 1;
@@ -119,7 +119,7 @@ fn test_default_counter_mode() {
 
             let filled = counter_size.saturating_sub(overflow_guard_size) as usize;
             for &e in counts_by_pos[..filled].iter() {
-                assert!((e as f64 / N as f64 - 0.5).abs() < margin);
+                assert!((e as f64 / N_LOOPS as f64 - 0.5).abs() < margin);
             }
             for &e in counts_by_pos[filled..].iter() {
                 assert_eq!(e, 0);

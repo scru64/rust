@@ -17,7 +17,7 @@ pub use global_gen::GlobalGenerator;
 
 /// Represents a SCRU64 ID generator.
 ///
-/// The generator offers four different methods to generate a SCRU64 ID:
+/// The generator comes with several different methods that generate a SCRU64 ID:
 ///
 /// | Flavor                     | Timestamp | On big clock rewind |
 /// | -------------------------- | --------- | ------------------- |
@@ -26,11 +26,18 @@ pub use global_gen::GlobalGenerator;
 /// | [`generate_or_abort_core`] | Argument  | Returns `None`      |
 /// | [`generate_or_reset_core`] | Argument  | Resets generator    |
 ///
-/// All of these methods return monotonically increasing IDs unless a timestamp provided is
-/// significantly (by default, approx. 10 seconds) smaller than the one embedded in the immediately
-/// preceding ID. If such a significant clock rollback is detected, the `generate` (or_abort)
-/// method aborts and returns `None`, while the `or_reset` variants reset the generator and return
-/// a new ID based on the given timestamp. The `core` functions offer low-level primitives.
+/// All of these methods return a monotonically increasing ID by reusing the previous `timestamp`
+/// even if the one provided is smaller than the immediately preceding ID's, unless such a clock
+/// rollback is considered significant (by default, approx. 10 seconds). A clock rollback may also
+/// be detected when a generator has generated too many IDs within a certain unit of time, because
+/// this implementation increments the previous `timestamp` when `counter` reaches the limit to
+/// continue instant monotonic generation. When a significant clock rollback is detected:
+///
+/// 1.  `generate` (or_abort) methods abort and return `None` immediately.
+/// 2.  `or_reset` variants reset the generator and return a new ID based on the given `timestamp`,
+///     breaking the increasing order of IDs.
+///
+/// The `core` functions offer low-level primitives to customize the behavior.
 ///
 /// [`generate`]: Scru64Generator::generate
 /// [`generate_or_reset`]: Scru64Generator::generate_or_reset

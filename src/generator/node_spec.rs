@@ -12,11 +12,14 @@ use super::Scru64Generator;
 /// Represents a node configuration specifier used to build a [`Scru64Generator`].
 ///
 /// A `NodeSpec` is usually expressed as a node spec string, which starts with a decimal `node_id`,
-/// a hexadecimal `node_id` prefixed with `"0x"`, or a 12-digit `node_prev` SCRU64 ID value,
-/// followed by a slash and a decimal `node_id_size` value ranging from 1 to 23 (e.g., `"42/8"`,
-/// `"0xb00/12"`, `"0u2r85hm2pt3/16"`). The first and second forms create a fresh new generator
-/// with the given `node_id`, while the third form constructs one that generates subsequent SCRU64
-/// IDs to the `node_prev`.
+/// a hexadecimal `node_id` prefixed by "0x", or a 12-digit `node_prev` SCRU64 ID value, followed
+/// by a slash and a decimal `node_id_size` value ranging from 1 to 23 (e.g., "42/8", "0xb00/12",
+/// "0u2r85hm2pt3/16"). The first and second forms create a fresh new generator with the given
+/// `node_id`, while the third form constructs one that generates subsequent SCRU64 IDs to the
+/// `node_prev`. See also [the usage notes] in the SCRU64 spec for tips and techniques to design
+/// node configurations.
+///
+/// [the usage notes]: https://github.com/scru64/spec#informative-usage-notes
 ///
 /// # Examples
 ///

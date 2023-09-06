@@ -524,6 +524,7 @@ mod tests {
     fn from_parts_error() {
         let max = 36u64.pow(12) - 1;
         assert!(Scru64Id::from_parts(max >> 24, (max as u32 & 0xff_ffff) + 1).is_err());
+        assert!(Scru64Id::from_parts((max >> 24) + 1, 0).is_err());
     }
 }
 
