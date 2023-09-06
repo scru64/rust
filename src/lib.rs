@@ -79,10 +79,12 @@ mod shortcut {
 
     /// Generates a new SCRU64 ID object using the global generator.
     ///
-    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
-    /// environment variable by default, and it panics if it fails to read a well-formed node spec
-    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
-    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
+    /// By default, the global generator reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable when a generator method is first called, and it panics if it fails to
+    /// do so. The node configuration is encoded in a node spec string consisting of `node_id` and
+    /// `node_id_size` integers separated by a slash (e.g., "42/8", "0xb00/12"; see [`NodeSpec`]
+    /// for details). You can configure the global generator differently by calling
+    /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_tokio::new`]
@@ -91,6 +93,8 @@ mod shortcut {
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
+    ///
+    /// [`NodeSpec`]: crate::generator::NodeSpec
     pub fn new() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
@@ -104,10 +108,12 @@ mod shortcut {
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
     ///
-    /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
-    /// environment variable by default, and it panics if it fails to read a well-formed node spec
-    /// string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method is first
-    /// called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec string format.
+    /// By default, the global generator reads the node configuration from the `SCRU64_NODE_SPEC`
+    /// environment variable when a generator method is first called, and it panics if it fails to
+    /// do so. The node configuration is encoded in a node spec string consisting of `node_id` and
+    /// `node_id_size` integers separated by a slash (e.g., "42/8", "0xb00/12"; see [`NodeSpec`]
+    /// for details). You can configure the global generator differently by calling
+    /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see
@@ -116,6 +122,8 @@ mod shortcut {
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
+    ///
+    /// [`NodeSpec`]: crate::generator::NodeSpec
     pub fn new_string() -> String {
         new().into()
     }
@@ -142,11 +150,13 @@ mod shortcut {
 
         /// Generates a new SCRU64 ID object using the global generator.
         ///
-        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable by default, and it panics if it fails to read a well-formed node
-        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
-        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
-        /// string format.
+        /// By default, the global generator reads the node configuration from the
+        /// `SCRU64_NODE_SPEC` environment variable when a generator method is first called, and it
+        /// panics if it fails to do so. The node configuration is encoded in a node spec string
+        /// consisting of `node_id` and `node_id_size` integers separated by a slash (e.g., "42/8",
+        /// "0xb00/12"; see [`NodeSpec`] for details). You can configure the global generator
+        /// differently by calling [`GlobalGenerator::initialize`] before the default initializer
+        /// is triggered.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
@@ -154,6 +164,8 @@ mod shortcut {
         /// # Panics
         ///
         /// Panics if the global generator is not properly configured.
+        ///
+        /// [`NodeSpec`]: crate::generator::NodeSpec
         pub async fn new() -> Scru64Id {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
@@ -167,11 +179,13 @@ mod shortcut {
         /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using
         /// the global generator.
         ///
-        /// The [`GlobalGenerator`] reads the node configuration from the `SCRU64_NODE_SPEC`
-        /// environment variable by default, and it panics if it fails to read a well-formed node
-        /// spec string (e.g., `"42/8"`, `"0xb00/12"`, `"0u2r85hm2pt3/16"`) when a generator method
-        /// is first called. See also [`NodeSpec`](crate::generator::NodeSpec) for the node spec
-        /// string format.
+        /// By default, the global generator reads the node configuration from the
+        /// `SCRU64_NODE_SPEC` environment variable when a generator method is first called, and it
+        /// panics if it fails to do so. The node configuration is encoded in a node spec string
+        /// consisting of `node_id` and `node_id_size` integers separated by a slash (e.g., "42/8",
+        /// "0xb00/12"; see [`NodeSpec`] for details). You can configure the global generator
+        /// differently by calling [`GlobalGenerator::initialize`] before the default initializer
+        /// is triggered.
         ///
         /// This function usually returns a value immediately, but if not possible, it sleeps and
         /// waits for the next timestamp tick.
@@ -179,6 +193,8 @@ mod shortcut {
         /// # Panics
         ///
         /// Panics if the global generator is not properly configured.
+        ///
+        /// [`NodeSpec`]: crate::generator::NodeSpec
         pub async fn new_string() -> String {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
