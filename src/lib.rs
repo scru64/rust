@@ -54,6 +54,7 @@
 pub mod gen;
 pub mod id;
 
+pub use gen::Scru64Generator;
 pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]

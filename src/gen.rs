@@ -56,7 +56,7 @@ impl Scru64Generator {
     /// # Examples
     ///
     /// ```rust
-    /// use scru64::gen::Scru64Generator;
+    /// use scru64::Scru64Generator;
     ///
     /// let g = Scru64Generator::new("42/8".parse()?);
     /// # Ok::<(), scru64::gen::NodeSpecParseError>(())
