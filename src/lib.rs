@@ -44,9 +44,9 @@
 //! Optional features:
 //!
 //! - `serde` enables serialization/deserialization via serde.
-//! - `tokio` (together with `global_gen`) enables the [`async_tokio::new()`] and
-//!   [`async_tokio::new_string()`] functions, the non-blocking counterpart of [`new()`]
-//!   and [`new_string()`].
+//! - `tokio` (together with `global_gen`) enables the [`tokio::new()`] and
+//!   [`tokio::new_string()`] functions, the non-blocking counterpart of [`new()`] and
+//!   [`new_string()`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -60,7 +60,7 @@ pub use identifier::{ParseError, PartsError, RangeError, Scru64Id};
 pub use shortcut::{new, new_string};
 
 #[cfg(all(feature = "global_gen", feature = "tokio"))]
-pub use shortcut::async_tokio;
+pub use shortcut::tokio;
 
 #[cfg(test)]
 mod test_cases;
@@ -87,8 +87,8 @@ mod shortcut {
     /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_tokio::new`]
-    /// for the non-blocking equivalent.
+    /// for the next timestamp tick. It employs blocking sleep to wait; see [`tokio::new`] for the
+    /// non-blocking equivalent.
     ///
     /// # Panics
     ///
@@ -117,7 +117,7 @@ mod shortcut {
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see
-    /// [`async_tokio::new_string`] for the non-blocking equivalent.
+    /// [`tokio::new_string`] for the non-blocking equivalent.
     ///
     /// # Panics
     ///
@@ -145,7 +145,7 @@ mod shortcut {
     /// Non-blocking global generator functions using `tokio`.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub mod async_tokio {
+    pub mod tokio {
         use super::{GlobalGenerator, Scru64Id, DELAY};
 
         /// Generates a new SCRU64 ID object using the global generator.

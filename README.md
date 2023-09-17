@@ -47,9 +47,9 @@ Default features:
 Optional features:
 
 - `serde` enables serialization/deserialization via serde.
-- `tokio` (together with `global_gen`) enables the `async_tokio::new()` and
-  `async_tokio::new_string()` functions, the non-blocking counterpart of `new()`
-  and `new_string()`.
+- `tokio` (together with `global_gen`) enables the `tokio::new()` and
+  `tokio::new_string()` functions, the non-blocking counterpart of `new()` and
+  `new_string()`.
 
 ## License
 
