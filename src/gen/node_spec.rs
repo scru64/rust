@@ -24,7 +24,7 @@ use super::Scru64Generator;
 /// # Examples
 ///
 /// ```rust
-/// use scru64::generator::NodeSpec;
+/// use scru64::gen::NodeSpec;
 ///
 /// let a = "42/8".parse::<NodeSpec>()?;
 /// assert_eq!(a.node_id(), 42);
@@ -43,7 +43,7 @@ use super::Scru64Generator;
 ///     c.node_prev(),
 ///     "0u2r85hm2pt3".parse::<scru64::Scru64Id>().ok()
 /// );
-/// # Ok::<(), scru64::generator::NodeSpecParseError>(())
+/// # Ok::<(), scru64::gen::NodeSpecParseError>(())
 /// ```
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct NodeSpec {

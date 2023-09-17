@@ -51,7 +51,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod generator;
+pub mod gen;
 pub mod id;
 
 pub use id::Scru64Id;
@@ -73,7 +73,7 @@ const NODE_CTR_SIZE: u8 = 24;
 mod shortcut {
     use std::{thread, time};
 
-    use crate::{generator::GlobalGenerator, Scru64Id};
+    use crate::{gen::GlobalGenerator, Scru64Id};
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
@@ -94,7 +94,7 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::generator::NodeSpec
+    /// [`NodeSpec`]: crate::gen::NodeSpec
     pub fn new() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
@@ -123,7 +123,7 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::generator::NodeSpec
+    /// [`NodeSpec`]: crate::gen::NodeSpec
     pub fn new_string() -> String {
         new().into()
     }
@@ -165,7 +165,7 @@ mod shortcut {
         ///
         /// Panics if the global generator is not properly configured.
         ///
-        /// [`NodeSpec`]: crate::generator::NodeSpec
+        /// [`NodeSpec`]: crate::gen::NodeSpec
         pub async fn new() -> Scru64Id {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
@@ -194,7 +194,7 @@ mod shortcut {
         ///
         /// Panics if the global generator is not properly configured.
         ///
-        /// [`NodeSpec`]: crate::generator::NodeSpec
+        /// [`NodeSpec`]: crate::gen::NodeSpec
         pub async fn new_string() -> String {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
