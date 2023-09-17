@@ -4,7 +4,7 @@
 use core as std;
 use std::{fmt, str};
 
-use crate::{ParseError as Scru64IdParseError, Scru64Id, NODE_CTR_SIZE};
+use crate::{id::ParseError as Scru64IdParseError, Scru64Id, NODE_CTR_SIZE};
 
 #[cfg(doc)]
 use super::Scru64Generator;

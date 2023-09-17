@@ -52,9 +52,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod generator;
+pub mod id;
 
-mod identifier;
-pub use identifier::{ParseError, PartsError, RangeError, Scru64Id};
+pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
 pub use shortcut::{new, new_string};
