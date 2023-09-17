@@ -4,7 +4,7 @@
 use core as std;
 use std::{fmt, str};
 
-use crate::{id::ParseError as Scru64IdParseError, Scru64Id, NODE_CTR_SIZE};
+use crate::{id::ParseError, Scru64Id, NODE_CTR_SIZE};
 
 #[cfg(doc)]
 use super::Scru64Generator;
@@ -72,7 +72,9 @@ impl NodeSpec {
                 node_id_size,
             })
         } else {
-            Err(NodeSpecError::NodeIdSize { node_id_size })
+            Err(NodeSpecError {
+                kind: NodeSpecErrorKind::NodeIdSize { node_id_size },
+            })
         }
     }
 
@@ -108,13 +110,17 @@ impl NodeSpec {
                     Err(_) => unreachable!(),
                 }
             } else {
-                Err(NodeSpecError::NodeIdRange {
-                    node_id,
-                    node_id_size,
+                Err(NodeSpecError {
+                    kind: NodeSpecErrorKind::NodeIdRange {
+                        node_id,
+                        node_id_size,
+                    },
                 })
             }
         } else {
-            Err(NodeSpecError::NodeIdSize { node_id_size })
+            Err(NodeSpecError {
+                kind: NodeSpecErrorKind::NodeIdSize { node_id_size },
+            })
         }
     }
 
@@ -178,23 +184,25 @@ impl fmt::Display for NodeSpec {
 /// An error representing an invalid pair of `node_id` and `node_id_size` to construct a
 /// [`NodeSpec`] instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum NodeSpecError {
-    /// Indicates that `node_id_size` is out of range.
-    NodeIdSize { node_id_size: u8 },
+pub struct NodeSpecError {
+    kind: NodeSpecErrorKind,
+}
 
-    /// Indicates that `node_id` is out of `node_id_size`-bit range.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum NodeSpecErrorKind {
+    NodeIdSize { node_id_size: u8 },
     NodeIdRange { node_id: u32, node_id_size: u8 },
 }
 
 impl fmt::Display for NodeSpecError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NodeIdSize { node_id_size } => write!(
+        match self.kind {
+            NodeSpecErrorKind::NodeIdSize { node_id_size } => write!(
                 f,
                 "`node_id_size` ({}) must range from 1 to 23",
                 node_id_size
             ),
-            Self::NodeIdRange {
+            NodeSpecErrorKind::NodeIdRange {
                 node_id,
                 node_id_size,
             } => write!(
@@ -216,7 +224,7 @@ pub struct NodeSpecParseError {
 enum NodeSpecParseErrorKind {
     Syntax,
     Right,
-    LeftPrev { source: Scru64IdParseError },
+    LeftPrev { source: ParseError },
     LeftNodeId,
     NodeSpec { source: NodeSpecError },
 }
