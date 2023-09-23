@@ -1,3 +1,5 @@
+//! SCRU64 identifier and error types.
+
 #[cfg(not(feature = "std"))]
 use core as std;
 use std::{any, fmt, str};
@@ -157,7 +159,7 @@ impl Scru64Id {
     /// let y = x.encode();
     /// assert_eq!(y, "0u2r87q2rol5");
     /// assert_eq!(format!("{}", y), "0u2r87q2rol5");
-    /// # Ok::<(), scru64::ParseError>(())
+    /// # Ok::<(), scru64::id::ParseError>(())
     /// ```
     pub const fn encode(self) -> FStr<12> {
         let mut buffer = [0u8; 12];
