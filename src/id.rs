@@ -103,7 +103,7 @@ impl Scru64Id {
         self.0 >> NODE_CTR_SIZE
     }
 
-    /// Returns the `node_id` and `counter` field values combined as a single integer.
+    /// Returns the `node_id` and `counter` field values combined as a single 24-bit integer.
     pub const fn node_ctr(self) -> u32 {
         self.0 as u32 & MAX_NODE_CTR
     }
