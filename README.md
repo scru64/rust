@@ -14,7 +14,7 @@ distributed nodes. SCRU64 has the following features:
 
 ```rust
 // pass node ID through environment variable
-std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+// (e.g., SCRU64_NODE_SPEC=42/8 command ...)
 
 // generate a new identifier object
 let x = scru64::new();

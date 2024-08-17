@@ -14,7 +14,7 @@ use super::{NodeSpec, Scru64Generator, Scru64Id};
 /// # Examples
 ///
 /// ```rust
-/// use scru64::gen::GlobalGenerator;
+/// use scru64::generator::GlobalGenerator;
 ///
 /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
 ///
@@ -50,7 +50,7 @@ impl GlobalGenerator {
     /// # Examples
     ///
     /// ```rust
-    /// use scru64::gen::GlobalGenerator;
+    /// use scru64::generator::GlobalGenerator;
     ///
     /// let x = GlobalGenerator.initialize("0xb00/12".parse()?);
     /// assert!(x.is_ok());
@@ -64,14 +64,14 @@ impl GlobalGenerator {
     /// assert_eq!(GlobalGenerator.node_id(), 0xb00);
     /// assert_eq!(GlobalGenerator.node_id_size(), 12);
     /// assert_eq!(GlobalGenerator.node_spec().to_string(), "2816/12");
-    /// # Ok::<(), scru64::gen::NodeSpecParseError>(())
+    /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
     /// ```
     ///
     /// Use this method to substitute for the default panicking initializer to handle errors
     /// gracefully.
     ///
     /// ```rust
-    /// use scru64::gen::GlobalGenerator;
+    /// use scru64::generator::GlobalGenerator;
     ///
     /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
     ///

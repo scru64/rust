@@ -59,7 +59,7 @@ impl Scru64Generator {
     /// use scru64::Scru64Generator;
     ///
     /// let g = Scru64Generator::new("42/8".parse()?);
-    /// # Ok::<(), scru64::gen::NodeSpecParseError>(())
+    /// # Ok::<(), scru64::generator::NodeSpecParseError>(())
     /// ```
     pub const fn new(node_spec: NodeSpec) -> Self {
         if node_spec.node_id_size() < 20 {

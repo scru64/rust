@@ -11,7 +11,8 @@
 //!
 //! ```rust
 //! // pass node ID through environment variable
-//! std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+//! // (e.g., SCRU64_NODE_SPEC=42/8 command ...)
+//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //!
 //! // generate a new identifier object
 //! let x = scru64::new();
@@ -51,10 +52,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod gen;
+pub mod generator;
+#[doc(hidden)]
+pub use generator as r#gen;
 pub mod id;
 
-pub use gen::Scru64Generator;
+pub use generator::Scru64Generator;
 pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
@@ -74,7 +77,7 @@ const NODE_CTR_SIZE: u8 = 24;
 mod shortcut {
     use std::{thread, time};
 
-    use crate::{gen::GlobalGenerator, Scru64Id};
+    use crate::{generator::GlobalGenerator, Scru64Id};
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
@@ -95,7 +98,7 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::gen::NodeSpec
+    /// [`NodeSpec`]: crate::generator::NodeSpec
     pub fn new() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
@@ -124,7 +127,7 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::gen::NodeSpec
+    /// [`NodeSpec`]: crate::generator::NodeSpec
     pub fn new_string() -> String {
         new().into()
     }
@@ -133,7 +136,8 @@ mod shortcut {
     #[cfg(test)]
     #[test]
     fn test() {
-        std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+        // XXX: No fix available: the environment access must happen in single-threaded code.
+        unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 
         let mut prev = new_string();
         for _ in 0..100_000 {
@@ -166,7 +170,7 @@ mod shortcut {
         ///
         /// Panics if the global generator is not properly configured.
         ///
-        /// [`NodeSpec`]: crate::gen::NodeSpec
+        /// [`NodeSpec`]: crate::generator::NodeSpec
         pub async fn new() -> Scru64Id {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
@@ -195,7 +199,7 @@ mod shortcut {
         ///
         /// Panics if the global generator is not properly configured.
         ///
-        /// [`NodeSpec`]: crate::gen::NodeSpec
+        /// [`NodeSpec`]: crate::generator::NodeSpec
         pub async fn new_string() -> String {
             loop {
                 if let Some(value) = GlobalGenerator.generate() {
@@ -210,7 +214,8 @@ mod shortcut {
         #[cfg(test)]
         #[tokio::test]
         async fn test() {
-            std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+            // XXX: No fix available: the environment access must happen in single-threaded code.
+            unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 
             let mut prev = new_string().await;
             for _ in 0..100_000 {
