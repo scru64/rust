@@ -11,6 +11,8 @@ repository = "https://github.com/scru64/rust"
 default = ["global_gen"]
 std = ["fstr/std"]
 global_gen = ["std"]
+serde = ["dep:serde"]
+tokio = ["dep:tokio"]
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }

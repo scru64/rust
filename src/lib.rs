@@ -11,7 +11,8 @@
 //!
 //! ```rust
 //! // pass node ID through environment variable
-//! std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+//! // (e.g., SCRU64_NODE_SPEC=42/8 command ...)
+//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //!
 //! // generate a new identifier object
 //! let x = scru64::new();
@@ -135,7 +136,8 @@ mod shortcut {
     #[cfg(test)]
     #[test]
     fn test() {
-        std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+        // XXX: No fix available: the environment access must happen in single-threaded code.
+        unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 
         let mut prev = new_string();
         for _ in 0..100_000 {
@@ -212,7 +214,8 @@ mod shortcut {
         #[cfg(test)]
         #[tokio::test]
         async fn test() {
-            std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+            // XXX: No fix available: the environment access must happen in single-threaded code.
+            unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 
             let mut prev = new_string().await;
             for _ in 0..100_000 {
