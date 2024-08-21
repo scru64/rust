@@ -9,6 +9,7 @@ pub struct ExampleId<'a> {
 #[derive(Debug)]
 pub struct ExampleNodeSpec<'a, 'b, 'c> {
     pub node_spec: &'a str,
+    #[cfg_attr(not(any(feature = "std", feature = "serde")), allow(dead_code))]
     pub canonical: &'b str,
     pub spec_type: &'c str,
     pub node_id: u32,
