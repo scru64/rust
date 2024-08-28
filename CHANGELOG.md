@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.2 - 2024-08-29
+
+### Fixed
+
+- "Available on crate features ... only" labels in the document
+
 ## v1.0.1 - 2024-08-17
 
 ### Changed
