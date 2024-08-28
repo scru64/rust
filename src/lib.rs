@@ -61,9 +61,11 @@ pub use generator::Scru64Generator;
 pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 pub use shortcut::{new, new_string};
 
 #[cfg(all(feature = "global_gen", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "global_gen", feature = "tokio"))))]
 pub use shortcut::tokio;
 
 #[cfg(test)]
@@ -73,7 +75,6 @@ mod test_cases;
 const NODE_CTR_SIZE: u8 = 24;
 
 #[cfg(feature = "global_gen")]
-#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 mod shortcut {
     use std::{thread, time};
 
@@ -149,7 +150,6 @@ mod shortcut {
 
     /// Non-blocking global generator functions using `tokio`.
     #[cfg(feature = "tokio")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub mod tokio {
         use super::{GlobalGenerator, Scru64Id, DELAY};
 
