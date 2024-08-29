@@ -135,8 +135,7 @@ mod shortcut {
     #[cfg(test)]
     #[test]
     fn test() {
-        // XXX: No fix available: the environment access must happen in single-threaded code.
-        unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
         let mut prev = new_string();
         for _ in 0..100_000 {
@@ -269,8 +268,8 @@ pub mod tokio {
     #[cfg(test)]
     #[tokio::test]
     async fn test() {
-        // XXX: No fix available: the environment access must happen in single-threaded code.
-        unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
+        use crate::generator::GlobalGenerator;
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
         let mut prev = new_string().await;
         for _ in 0..100_000 {

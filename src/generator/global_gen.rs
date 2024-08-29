@@ -16,7 +16,7 @@ use super::{NodeSpec, Scru64Generator, Scru64Id};
 /// ```rust
 /// use scru64::generator::GlobalGenerator;
 ///
-/// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+/// unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 ///
 /// assert_eq!(GlobalGenerator.node_id(), 42);
 /// assert_eq!(GlobalGenerator.node_id_size(), 8);
@@ -73,7 +73,7 @@ impl GlobalGenerator {
     /// ```rust
     /// use scru64::generator::GlobalGenerator;
     ///
-    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+    /// unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
     ///
     /// let node_spec = std::env::var("SCRU64_NODE_SPEC")?.parse()?;
     /// assert!(GlobalGenerator.initialize(node_spec).is_ok());

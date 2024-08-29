@@ -6,6 +6,10 @@
 
 - Separate test case testing env var-related functionality in a safe manner
 
+### Maintenance
+
+- Refactoring and test case cleaning
+
 ## v1.0.2 - 2024-08-29
 
 ### Fixed
