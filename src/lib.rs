@@ -64,6 +64,10 @@ pub use id::Scru64Id;
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 pub use shortcut::{new, new_string};
 
+#[cfg(all(feature = "global_gen", feature = "unstable"))]
+#[doc(hidden)]
+pub use shortcut::{new_string_with, new_with};
+
 #[cfg(test)]
 mod test_cases;
 
@@ -155,17 +159,17 @@ mod shortcut {
     /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick using the asynchronous sleep function (e.g.,
-    /// `tokio::time::sleep`, `smol::Timer::after`, and `async_std::task::sleep`) provided as the
-    /// argument.
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     ///
     /// [`NodeSpec`]: crate::generator::NodeSpec
-    #[cfg(feature = "tokio")]
-    pub async fn new_async<F, T>(mut sleep: impl FnMut(time::Duration) -> F) -> Scru64Id
+    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    pub async fn new_with<F, T>(mut async_sleep_fn: impl FnMut(time::Duration) -> F) -> Scru64Id
     where
         F: std::future::Future<Output = T>,
     {
@@ -173,7 +177,7 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
-                sleep(DELAY).await;
+                async_sleep_fn(DELAY).await;
             }
         }
     }
@@ -189,17 +193,19 @@ mod shortcut {
     /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick using the asynchronous sleep function (e.g.,
-    /// `tokio::time::sleep`, `smol::Timer::after`, and `async_std::task::sleep`) provided as the
-    /// argument.
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     ///
     /// [`NodeSpec`]: crate::generator::NodeSpec
-    #[cfg(feature = "tokio")]
-    pub async fn new_string_async<F, T>(mut sleep: impl FnMut(time::Duration) -> F) -> String
+    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    pub async fn new_string_with<F, T>(
+        mut async_sleep_fn: impl FnMut(time::Duration) -> F,
+    ) -> String
     where
         F: std::future::Future<Output = T>,
     {
@@ -207,7 +213,7 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value.into();
             } else {
-                sleep(DELAY).await;
+                async_sleep_fn(DELAY).await;
             }
         }
     }
@@ -238,7 +244,7 @@ pub mod tokio {
     /// [`NodeSpec`]: crate::generator::NodeSpec
     /// [`GlobalGenerator::initialize`]: crate::generator::GlobalGenerator::initialize
     pub async fn new() -> Scru64Id {
-        shortcut::new_async(tokio::time::sleep).await
+        shortcut::new_with(tokio::time::sleep).await
     }
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
@@ -261,7 +267,7 @@ pub mod tokio {
     /// [`NodeSpec`]: crate::generator::NodeSpec
     /// [`GlobalGenerator::initialize`]: crate::generator::GlobalGenerator::initialize
     pub async fn new_string() -> String {
-        shortcut::new_string_async(tokio::time::sleep).await
+        shortcut::new_string_with(tokio::time::sleep).await
     }
 
     /// Generates 100k monotonically increasing IDs.

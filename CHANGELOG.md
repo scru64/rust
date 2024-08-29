@@ -5,6 +5,9 @@
 ### Added
 
 - Separate test case testing env var-related functionality in a safe manner
+- `new_with()` and `new_string_with()` (via `unstable` crate feature) as
+  undocumented experimental functions that may be removed or changed between
+  minor releases
 
 ### Maintenance
 
