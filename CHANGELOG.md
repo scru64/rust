@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Separate test case testing env var-related functionality in a safe manner
+
 ## v1.0.2 - 2024-08-29
 
 ### Fixed
