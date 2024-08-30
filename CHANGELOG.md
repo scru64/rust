@@ -11,7 +11,8 @@
 
 ### Maintenance
 
-- Refactoring and test case cleaning
+- Code and document refactoring
+- Test case cleaning
 
 ## v1.0.2 - 2024-08-29
 
