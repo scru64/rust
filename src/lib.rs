@@ -64,9 +64,9 @@ pub use id::Scru64Id;
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 pub use shortcut::{new, new_string};
 
-#[cfg(all(feature = "global_gen", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "global_gen", feature = "tokio"))))]
-pub use shortcut::tokio;
+#[cfg(all(feature = "global_gen", feature = "unstable"))]
+#[doc(hidden)]
+pub use shortcut::{new_string_with, new_with};
 
 #[cfg(test)]
 mod test_cases;
@@ -83,13 +83,7 @@ mod shortcut {
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
     /// Generates a new SCRU64 ID object using the global generator.
-    ///
-    /// By default, the global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-    /// environment variable when a generator method is first called, and it panics if it fails to
-    /// do so. The node configuration is encoded in a node spec string consisting of `node_id` and
-    /// `node_id_size` integers separated by a slash (e.g., "42/8", "0xb00/12"; see [`NodeSpec`]
-    /// for details). You can configure the global generator differently by calling
-    /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`tokio::new`] for the
@@ -99,7 +93,7 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::generator::NodeSpec
+    /// [`tokio::new`]: crate::tokio::new
     pub fn new() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
@@ -112,23 +106,17 @@ mod shortcut {
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
-    ///
-    /// By default, the global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-    /// environment variable when a generator method is first called, and it panics if it fails to
-    /// do so. The node configuration is encoded in a node spec string consisting of `node_id` and
-    /// `node_id_size` integers separated by a slash (e.g., "42/8", "0xb00/12"; see [`NodeSpec`]
-    /// for details). You can configure the global generator differently by calling
-    /// [`GlobalGenerator::initialize`] before the default initializer is triggered.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick. It employs blocking sleep to wait; see
-    /// [`tokio::new_string`] for the non-blocking equivalent.
+    /// for the next timestamp tick. It employs blocking sleep to wait; see [`tokio::new_string`]
+    /// for the non-blocking equivalent.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     ///
-    /// [`NodeSpec`]: crate::generator::NodeSpec
+    /// [`tokio::new_string`]: crate::tokio::new_string
     pub fn new_string() -> String {
         new().into()
     }
@@ -137,8 +125,7 @@ mod shortcut {
     #[cfg(test)]
     #[test]
     fn test() {
-        // XXX: No fix available: the environment access must happen in single-threaded code.
-        unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
         let mut prev = new_string();
         for _ in 0..100_000 {
@@ -148,81 +135,105 @@ mod shortcut {
         }
     }
 
-    /// Non-blocking global generator functions using `tokio`.
-    #[cfg(feature = "tokio")]
-    pub mod tokio {
-        use super::{GlobalGenerator, Scru64Id, DELAY};
-
-        /// Generates a new SCRU64 ID object using the global generator.
-        ///
-        /// By default, the global generator reads the node configuration from the
-        /// `SCRU64_NODE_SPEC` environment variable when a generator method is first called, and it
-        /// panics if it fails to do so. The node configuration is encoded in a node spec string
-        /// consisting of `node_id` and `node_id_size` integers separated by a slash (e.g., "42/8",
-        /// "0xb00/12"; see [`NodeSpec`] for details). You can configure the global generator
-        /// differently by calling [`GlobalGenerator::initialize`] before the default initializer
-        /// is triggered.
-        ///
-        /// This function usually returns a value immediately, but if not possible, it sleeps and
-        /// waits for the next timestamp tick.
-        ///
-        /// # Panics
-        ///
-        /// Panics if the global generator is not properly configured.
-        ///
-        /// [`NodeSpec`]: crate::generator::NodeSpec
-        pub async fn new() -> Scru64Id {
-            loop {
-                if let Some(value) = GlobalGenerator.generate() {
-                    break value;
-                } else {
-                    tokio::time::sleep(DELAY).await;
-                }
+    /// Generates a new SCRU64 ID object using the global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    pub async fn new_with<F, T>(mut async_sleep_fn: impl FnMut(time::Duration) -> F) -> Scru64Id
+    where
+        F: std::future::Future<Output = T>,
+    {
+        loop {
+            if let Some(value) = GlobalGenerator.generate() {
+                break value;
+            } else {
+                async_sleep_fn(DELAY).await;
             }
         }
+    }
 
-        /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using
-        /// the global generator.
-        ///
-        /// By default, the global generator reads the node configuration from the
-        /// `SCRU64_NODE_SPEC` environment variable when a generator method is first called, and it
-        /// panics if it fails to do so. The node configuration is encoded in a node spec string
-        /// consisting of `node_id` and `node_id_size` integers separated by a slash (e.g., "42/8",
-        /// "0xb00/12"; see [`NodeSpec`] for details). You can configure the global generator
-        /// differently by calling [`GlobalGenerator::initialize`] before the default initializer
-        /// is triggered.
-        ///
-        /// This function usually returns a value immediately, but if not possible, it sleeps and
-        /// waits for the next timestamp tick.
-        ///
-        /// # Panics
-        ///
-        /// Panics if the global generator is not properly configured.
-        ///
-        /// [`NodeSpec`]: crate::generator::NodeSpec
-        pub async fn new_string() -> String {
-            loop {
-                if let Some(value) = GlobalGenerator.generate() {
-                    break value.into();
-                } else {
-                    tokio::time::sleep(DELAY).await;
-                }
+    /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
+    /// global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    pub async fn new_string_with<F, T>(
+        mut async_sleep_fn: impl FnMut(time::Duration) -> F,
+    ) -> String
+    where
+        F: std::future::Future<Output = T>,
+    {
+        loop {
+            if let Some(value) = GlobalGenerator.generate() {
+                break value.into();
+            } else {
+                async_sleep_fn(DELAY).await;
             }
         }
+    }
+}
 
-        /// Generates 100k monotonically increasing IDs.
-        #[cfg(test)]
-        #[tokio::test]
-        async fn test() {
-            // XXX: No fix available: the environment access must happen in single-threaded code.
-            unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
+/// Non-blocking global generator functions using `tokio`.
+#[cfg(all(feature = "global_gen", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "global_gen", feature = "tokio"))))]
+pub mod tokio {
+    use crate::{shortcut, Scru64Id};
 
-            let mut prev = new_string().await;
-            for _ in 0..100_000 {
-                let curr = new_string().await;
-                assert!(prev < curr);
-                prev = curr;
-            }
+    /// Generates a new SCRU64 ID object using the global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    pub async fn new() -> Scru64Id {
+        shortcut::new_with(tokio::time::sleep).await
+    }
+
+    /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
+    /// global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    pub async fn new_string() -> String {
+        shortcut::new_string_with(tokio::time::sleep).await
+    }
+
+    /// Generates 100k monotonically increasing IDs.
+    #[cfg(test)]
+    #[tokio::test]
+    async fn test() {
+        use crate::generator::GlobalGenerator;
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
+
+        let mut prev = new_string().await;
+        for _ in 0..100_000 {
+            let curr = new_string().await;
+            assert!(prev < curr);
+            prev = curr;
         }
     }
 }

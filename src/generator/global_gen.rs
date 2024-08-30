@@ -3,20 +3,14 @@ use std::{env, error, fmt, sync};
 use super::{NodeSpec, Scru64Generator, Scru64Id};
 
 /// A zero-sized type that forwards supported method calls to the process-wide global generator.
-///
-/// By default, the global generator reads the node configuration from the `SCRU64_NODE_SPEC`
-/// environment variable when a generator method is first called, and it panics if it fails to do
-/// so. The node configuration is encoded in a node spec string consisting of `node_id` and
-/// `node_id_size` integers separated by a slash (e.g., "42/8", "0xb00/12"; see [`NodeSpec`] for
-/// details). You can configure the global generator differently by calling
-/// [`GlobalGenerator::initialize`] before the default initializer is triggered.
+#[doc = concat!("\n\n", include_str!("doc_global_gen.md"), "\n\n")]
 ///
 /// # Examples
 ///
 /// ```rust
 /// use scru64::generator::GlobalGenerator;
 ///
-/// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+/// unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 ///
 /// assert_eq!(GlobalGenerator.node_id(), 42);
 /// assert_eq!(GlobalGenerator.node_id_size(), 8);
@@ -73,7 +67,7 @@ impl GlobalGenerator {
     /// ```rust
     /// use scru64::generator::GlobalGenerator;
     ///
-    /// std::env::set_var("SCRU64_NODE_SPEC", "42/8");
+    /// unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
     ///
     /// let node_spec = std::env::var("SCRU64_NODE_SPEC")?.parse()?;
     /// assert!(GlobalGenerator.initialize(node_spec).is_ok());
