@@ -1,16 +1,16 @@
 # Changelog
 
-## Unreleased
+## v1.0.3 - 2024-08-30
 
 ### Added
 
-- Separate test case testing env var-related functionality in a safe manner
 - `new_with()` and `new_string_with()` (via `unstable` crate feature) as
   undocumented experimental functions that may be removed or changed between
   minor releases
 
 ### Maintenance
 
+- Separate test case testing env var-related functionality in a safe manner
 - Code and document refactoring
 - Test case cleaning
 
