@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- `async-io` feature (`async_io::new()` and `async_io::new_string()`) to support
+  `async-std` and `smol`
+
 ### Removed
 
 - `new_with()`, `new_string_with()`, and `unstable` feature
