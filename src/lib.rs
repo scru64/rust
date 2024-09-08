@@ -78,7 +78,7 @@ mod shortcut {
 
     use crate::{generator::GlobalGenerator, Scru64Id};
 
-    pub const DELAY: time::Duration = time::Duration::from_millis(64);
+    const DELAY: time::Duration = time::Duration::from_millis(64);
 
     /// Generates a new SCRU64 ID object using the global generator.
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
@@ -138,14 +138,16 @@ mod shortcut {
     /// Generates a new SCRU64 ID object using the global generator.
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
-    /// This function usually returns a value immediately, but if not possible, it waits for the
-    /// next timestamp tick using the runtime-dependent yield function provided as the argument.
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     #[cfg(any(feature = "async-io", feature = "tokio"))]
-    pub async fn new_with<F>(mut yield_fn: impl FnMut() -> F) -> Scru64Id
+    pub async fn new_with<F>(mut sleep_fn: impl FnMut(time::Duration) -> F) -> Scru64Id
     where
         F: std::future::Future,
     {
@@ -153,7 +155,7 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
-                yield_fn().await;
+                sleep_fn(DELAY).await;
             }
         }
     }
@@ -162,14 +164,16 @@ mod shortcut {
     /// global generator.
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
-    /// This function usually returns a value immediately, but if not possible, it waits for the
-    /// next timestamp tick using the runtime-dependent yield function provided as the argument.
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
+    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
+    /// and `async_std::task::sleep`.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     #[cfg(any(feature = "async-io", feature = "tokio"))]
-    pub async fn new_string_with<F>(mut yield_fn: impl FnMut() -> F) -> String
+    pub async fn new_string_with<F>(mut sleep_fn: impl FnMut(time::Duration) -> F) -> String
     where
         F: std::future::Future,
     {
@@ -177,7 +181,7 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value.into();
             } else {
-                yield_fn().await;
+                sleep_fn(DELAY).await;
             }
         }
     }
@@ -199,7 +203,7 @@ pub mod async_io {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new() -> Scru64Id {
-        shortcut::new_with(|| async_io::Timer::after(shortcut::DELAY)).await
+        shortcut::new_with(async_io::Timer::after).await
     }
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
@@ -213,7 +217,7 @@ pub mod async_io {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new_string() -> String {
-        shortcut::new_string_with(|| async_io::Timer::after(shortcut::DELAY)).await
+        shortcut::new_string_with(async_io::Timer::after).await
     }
 
     /// Generates 100k monotonically increasing IDs.
@@ -248,7 +252,7 @@ pub mod tokio {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new() -> Scru64Id {
-        shortcut::new_with(|| tokio::time::sleep(shortcut::DELAY)).await
+        shortcut::new_with(tokio::time::sleep).await
     }
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
@@ -262,7 +266,7 @@ pub mod tokio {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new_string() -> String {
-        shortcut::new_string_with(|| tokio::time::sleep(shortcut::DELAY)).await
+        shortcut::new_string_with(tokio::time::sleep).await
     }
 
     /// Generates 100k monotonically increasing IDs.
