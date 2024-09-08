@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Parameters of `new_with()` and `new_string_with()` to allow callers to decide
+  polling intervals
+
 ## v1.0.3 - 2024-08-30
 
 ### Added
