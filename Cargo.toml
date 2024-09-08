@@ -13,7 +13,6 @@ std = ["fstr/std"]
 global_gen = ["std"]
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
-unstable = []
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }

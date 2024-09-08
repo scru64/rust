@@ -64,10 +64,6 @@ pub use id::Scru64Id;
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 pub use shortcut::{new, new_string};
 
-#[cfg(all(feature = "global_gen", feature = "unstable"))]
-#[doc(hidden)]
-pub use shortcut::{new_string_with, new_with};
-
 #[cfg(test)]
 mod test_cases;
 
@@ -144,7 +140,7 @@ mod shortcut {
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
-    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    #[cfg(feature = "tokio")]
     pub async fn new_with<F>(mut yield_fn: impl FnMut() -> F) -> Scru64Id
     where
         F: std::future::Future,
@@ -168,7 +164,7 @@ mod shortcut {
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
-    #[cfg(any(feature = "unstable", feature = "tokio"))]
+    #[cfg(feature = "tokio")]
     pub async fn new_string_with<F>(mut yield_fn: impl FnMut() -> F) -> String
     where
         F: std::future::Future,

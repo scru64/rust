@@ -2,10 +2,9 @@
 
 ## Unreleased
 
-### Changed
+### Removed
 
-- Parameters of `new_with()` and `new_string_with()` to allow callers to decide
-  polling intervals
+- `new_with()`, `new_string_with()`, and `unstable` feature
 
 ## v1.0.3 - 2024-08-30
 
