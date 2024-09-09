@@ -106,16 +106,29 @@ mod shortcut {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new_string() -> String {
-        new().await.into()
+        loop {
+            if let Some(value) = GlobalGenerator.generate() {
+                break value.into();
+            } else {
+                sleep_in_new_thread(DELAY).await;
+            }
+        }
     }
 
-    /// Generates 100k monotonically increasing IDs.
+    /// Generates 200k monotonically increasing IDs.
     #[cfg(test)]
     #[tokio::test]
     async fn test_async() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
-        let mut prev = new_string().await;
+        let mut prev = new().await;
+        for _ in 0..100_000 {
+            let curr = new().await;
+            assert!(prev < curr);
+            prev = curr;
+        }
+
+        let mut prev = String::from(prev);
         for _ in 0..100_000 {
             let curr = new_string().await;
             assert!(prev < curr);
@@ -158,13 +171,20 @@ mod shortcut {
         new_sync().into()
     }
 
-    /// Generates 100k monotonically increasing IDs.
+    /// Generates 200k monotonically increasing IDs.
     #[cfg(test)]
     #[test]
     fn test_sync() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
-        let mut prev = new_string_sync();
+        let mut prev = new_sync();
+        for _ in 0..100_000 {
+            let curr = new_sync();
+            assert!(prev < curr);
+            prev = curr;
+        }
+
+        let mut prev = String::from(prev);
         for _ in 0..100_000 {
             let curr = new_string_sync();
             assert!(prev < curr);
@@ -216,5 +236,25 @@ mod shortcut {
         });
 
         return_value
+    }
+
+    /// Tests if the task sleeps properly and asynchronously.
+    #[cfg(test)]
+    #[tokio::test]
+    async fn test_sleep_in_new_thread() {
+        let start = time::Instant::now();
+        sleep_in_new_thread(DELAY).await;
+        let elapsed = time::Instant::now().duration_since(start);
+        assert!(DELAY <= elapsed && elapsed < DELAY * 2);
+
+        let start = time::Instant::now();
+        tokio::join!(
+            sleep_in_new_thread(DELAY),
+            sleep_in_new_thread(DELAY),
+            sleep_in_new_thread(DELAY),
+            sleep_in_new_thread(DELAY),
+        );
+        let elapsed = time::Instant::now().duration_since(start);
+        assert!(DELAY <= elapsed && elapsed < DELAY * 2);
     }
 }
