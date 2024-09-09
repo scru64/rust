@@ -10,17 +10,17 @@
 //! - Variable-length node/machine ID and counter fields that share 24 bits
 //!
 //! ```rust
+//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //! // pass node ID through environment variable
 //! // (e.g., SCRU64_NODE_SPEC=42/8 command ...)
-//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //!
 //! // generate a new identifier object
-//! let x = scru64::new();
+//! let x = scru64::new_sync();
 //! println!("{}", x); // e.g., "0u2r85hm2pt3"
 //! println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 //!
 //! // generate a textual representation directly
-//! println!("{}", scru64::new_string()); // e.g., "0u2r85hm2pt4"
+//! println!("{}", scru64::new_string_sync()); // e.g., "0u2r85hm2pt4"
 //! ```
 //!
 //! See [SCRU64 Specification] for details.
@@ -39,15 +39,16 @@
 //! - `std` integrates the library with, among others, the system clock to draw
 //!   current timestamps. Without `std`, this crate provides limited functionality
 //!   available under `no_std` environments.
-//! - `global_gen` (implies `std`) enables the primary [`new()`] and [`new_string()`]
-//!   functions and the process-wide global generator under the hood.
+//! - `global_gen` (implies `std`) enables the primary [`new_sync()`] and
+//!   [`new_string_sync()`] functions and the process-wide global generator under the
+//!   hood.
 //!
 //! Optional features:
 //!
 //! - `serde` enables serialization/deserialization via serde.
 //! - `async-io` (together with `global_gen`) enables the [`async_io::new()`] and
-//!   [`async_io::new_string()`] functions, the non-blocking counterpart of [`new()`]
-//!   and [`new_string()`].
+//!   [`async_io::new_string()`] functions, the non-blocking counterpart of
+//!   [`new_sync()`] and [`new_string_sync()`].
 //! - `tokio` (together with `global_gen`), like `async-io`, enables the
 //!   [`tokio::new()`] and [`tokio::new_string()`] functions.
 
@@ -64,7 +65,23 @@ pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-pub use shortcut::{new, new_string};
+pub use shortcut::{new_string_sync, new_sync};
+
+/// A synonym for [`new_sync`].
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
+#[deprecated(since = "1.1.0", note = "use `new_sync()` instead")]
+pub fn new() -> Scru64Id {
+    new_sync()
+}
+
+/// A synonym for [`new_string_sync`].
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
+#[deprecated(since = "1.1.0", note = "use `new_string_sync()`")]
+pub fn new_string() -> String {
+    new_string_sync()
+}
 
 #[cfg(test)]
 mod test_cases;
@@ -93,7 +110,7 @@ mod shortcut {
     ///
     /// [`async_io::new`]: crate::async_io::new
     /// [`tokio::new`]: crate::tokio::new
-    pub fn new() -> Scru64Id {
+    pub fn new_sync() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
@@ -117,8 +134,8 @@ mod shortcut {
     ///
     /// [`async_io::new_string`]: crate::async_io::new_string
     /// [`tokio::new_string`]: crate::tokio::new_string
-    pub fn new_string() -> String {
-        new().into()
+    pub fn new_string_sync() -> String {
+        new_sync().into()
     }
 
     /// Generates 100k monotonically increasing IDs.
@@ -127,9 +144,9 @@ mod shortcut {
     fn test() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
-        let mut prev = new_string();
+        let mut prev = new_string_sync();
         for _ in 0..100_000 {
-            let curr = new_string();
+            let curr = new_string_sync();
             assert!(prev < curr);
             prev = curr;
         }

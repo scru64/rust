@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 - unreleased
+
+### Changed
+
+- Names of primary functions from `new()` and `new_string()` to `new_sync()` and
+  `new_string_sync()`, respectively
+  - Leaving old names as aliases for backward compatibility
 
 ### Added
 
