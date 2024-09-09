@@ -1,6 +1,6 @@
 [package]
 name = "scru64"
-version = "1.0.3"
+version = "1.1.0"
 authors = ["LiosK <contact@mail.liosk.net>"]
 license = "Apache-2.0"
 edition = "2021"
@@ -12,10 +12,11 @@ default = ["global_gen"]
 std = ["fstr/std"]
 global_gen = ["std"]
 serde = ["dep:serde"]
+async-io = ["dep:async-io"]
 tokio = ["dep:tokio"]
-unstable = []
 
 [dependencies]
+async-io = { version = "2.3", optional = true }
 fstr = { version = "0.2", default-features = false }
 serde = { version = "1.0", default-features = false, optional = true }
 tokio = { version = "1.27", features = ["time"], optional = true }

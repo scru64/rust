@@ -189,7 +189,7 @@ impl<C: CounterMode> Scru64Generator<C> {
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-mod std_ext {
+mod with_std {
     use super::{CounterMode, Scru64Generator, Scru64Id};
 
     /// Returns the current Unix timestamp in milliseconds.

@@ -10,17 +10,17 @@
 //! - Variable-length node/machine ID and counter fields that share 24 bits
 //!
 //! ```rust
+//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //! // pass node ID through environment variable
 //! // (e.g., SCRU64_NODE_SPEC=42/8 command ...)
-//! # unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
 //!
 //! // generate a new identifier object
-//! let x = scru64::new();
+//! let x = scru64::new_sync();
 //! println!("{}", x); // e.g., "0u2r85hm2pt3"
 //! println!("{}", x.to_u64()); // as a 64-bit unsigned integer
 //!
 //! // generate a textual representation directly
-//! println!("{}", scru64::new_string()); // e.g., "0u2r85hm2pt4"
+//! println!("{}", scru64::new_string_sync()); // e.g., "0u2r85hm2pt4"
 //! ```
 //!
 //! See [SCRU64 Specification] for details.
@@ -39,15 +39,18 @@
 //! - `std` integrates the library with, among others, the system clock to draw
 //!   current timestamps. Without `std`, this crate provides limited functionality
 //!   available under `no_std` environments.
-//! - `global_gen` (implies `std`) enables the primary [`new()`] and [`new_string()`]
-//!   functions and the process-wide global generator under the hood.
+//! - `global_gen` (implies `std`) enables the primary [`new_sync()`] and
+//!   [`new_string_sync()`] functions and the process-wide global generator under the
+//!   hood.
 //!
 //! Optional features:
 //!
 //! - `serde` enables serialization/deserialization via serde.
-//! - `tokio` (together with `global_gen`) enables the [`tokio::new()`] and
-//!   [`tokio::new_string()`] functions, the non-blocking counterpart of [`new()`] and
-//!   [`new_string()`].
+//! - `async-io` (together with `global_gen`) enables the [`async_io::new()`] and
+//!   [`async_io::new_string()`] functions, the non-blocking counterpart of
+//!   [`new_sync()`] and [`new_string_sync()`].
+//! - `tokio` (together with `global_gen`), like `async-io`, enables the
+//!   [`tokio::new()`] and [`tokio::new_string()`] functions.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -62,11 +65,23 @@ pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-pub use shortcut::{new, new_string};
+pub use shortcut::{new_string_sync, new_sync};
 
-#[cfg(all(feature = "global_gen", feature = "unstable"))]
-#[doc(hidden)]
-pub use shortcut::{new_string_with, new_with};
+/// A deprecated synonym for [`new_sync`].
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
+#[deprecated(since = "1.1.0", note = "use `new_sync()` (synonym) instead")]
+pub fn new() -> Scru64Id {
+    new_sync()
+}
+
+/// A deprecated synonym for [`new_string_sync`].
+#[cfg(feature = "global_gen")]
+#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
+#[deprecated(since = "1.1.0", note = "use `new_string_sync()` (synonym) instead")]
+pub fn new_string() -> String {
+    new_string_sync()
+}
 
 #[cfg(test)]
 mod test_cases;
@@ -86,15 +101,16 @@ mod shortcut {
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick. It employs blocking sleep to wait; see [`tokio::new`] for the
-    /// non-blocking equivalent.
+    /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_io::new`] and
+    /// [`tokio::new`] for the non-blocking equivalents.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     ///
+    /// [`async_io::new`]: crate::async_io::new
     /// [`tokio::new`]: crate::tokio::new
-    pub fn new() -> Scru64Id {
+    pub fn new_sync() -> Scru64Id {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
@@ -109,27 +125,35 @@ mod shortcut {
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick. It employs blocking sleep to wait; see [`tokio::new_string`]
-    /// for the non-blocking equivalent.
+    /// for the next timestamp tick. It employs blocking sleep to wait; see [`async_io::new_string`]
+    /// and [`tokio::new_string`] for the non-blocking equivalents.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
     ///
+    /// [`async_io::new_string`]: crate::async_io::new_string
     /// [`tokio::new_string`]: crate::tokio::new_string
-    pub fn new_string() -> String {
-        new().into()
+    pub fn new_string_sync() -> String {
+        new_sync().into()
     }
 
-    /// Generates 100k monotonically increasing IDs.
+    /// Generates 200k monotonically increasing IDs.
     #[cfg(test)]
     #[test]
-    fn test() {
+    fn test_sync() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
-        let mut prev = new_string();
+        let mut prev = new_sync();
         for _ in 0..100_000 {
-            let curr = new_string();
+            let curr = new_sync();
+            assert!(prev < curr);
+            prev = curr;
+        }
+
+        let mut prev = String::from(prev);
+        for _ in 0..100_000 {
+            let curr = new_string_sync();
             assert!(prev < curr);
             prev = curr;
         }
@@ -146,18 +170,38 @@ mod shortcut {
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
-    #[cfg(any(feature = "unstable", feature = "tokio"))]
-    pub async fn new_with<F, T>(mut async_sleep_fn: impl FnMut(time::Duration) -> F) -> Scru64Id
+    #[cfg(any(feature = "async-io", feature = "tokio"))]
+    pub async fn new_with<F>(mut sleep_fn: impl FnMut(time::Duration) -> F) -> Scru64Id
     where
-        F: std::future::Future<Output = T>,
+        F: std::future::Future,
     {
         loop {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
-                async_sleep_fn(DELAY).await;
+                sleep_fn(DELAY).await;
             }
         }
+    }
+}
+
+/// Non-blocking global generator functions using `async-io`.
+#[cfg(all(feature = "global_gen", feature = "async-io"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "global_gen", feature = "async-io"))))]
+pub mod async_io {
+    use crate::{shortcut, Scru64Id};
+
+    /// Generates a new SCRU64 ID object using the global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    pub async fn new() -> Scru64Id {
+        shortcut::new_with(async_io::Timer::after).await
     }
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
@@ -165,26 +209,27 @@ mod shortcut {
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
-    /// for the next timestamp tick using the asynchronous sleep function provided as the argument.
-    /// Typical asynchronous sleep functions include `tokio::time::sleep`, `smol::Timer::after`,
-    /// and `async_std::task::sleep`.
+    /// for the next timestamp tick.
     ///
     /// # Panics
     ///
     /// Panics if the global generator is not properly configured.
-    #[cfg(any(feature = "unstable", feature = "tokio"))]
-    pub async fn new_string_with<F, T>(
-        mut async_sleep_fn: impl FnMut(time::Duration) -> F,
-    ) -> String
-    where
-        F: std::future::Future<Output = T>,
-    {
-        loop {
-            if let Some(value) = GlobalGenerator.generate() {
-                break value.into();
-            } else {
-                async_sleep_fn(DELAY).await;
-            }
+    pub async fn new_string() -> String {
+        shortcut::new_with(async_io::Timer::after).await.into()
+    }
+
+    /// Generates 100k monotonically increasing IDs.
+    #[cfg(test)]
+    #[tokio::test]
+    async fn test() {
+        use crate::generator::GlobalGenerator;
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
+
+        let mut prev = new_string().await;
+        for _ in 0..100_000 {
+            let curr = new_string().await;
+            assert!(prev < curr);
+            prev = curr;
         }
     }
 }
@@ -219,7 +264,7 @@ pub mod tokio {
     ///
     /// Panics if the global generator is not properly configured.
     pub async fn new_string() -> String {
-        shortcut::new_string_with(tokio::time::sleep).await
+        shortcut::new_with(tokio::time::sleep).await.into()
     }
 
     /// Generates 100k monotonically increasing IDs.

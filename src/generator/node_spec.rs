@@ -254,7 +254,7 @@ impl fmt::Display for NodeSpecParseError {
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-mod std_ext {
+mod with_std {
     impl std::error::Error for super::NodeSpecError {}
     impl std::error::Error for super::NodeSpecParseError {}
 }
@@ -340,7 +340,7 @@ mod tests {
 
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-mod serde_support {
+mod with_serde {
     use super::{fmt, str, NodeSpec};
     use serde::{de, Deserializer, Serializer};
 

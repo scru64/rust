@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.0 - 2024-09-09
+
+### Changed
+
+- Names of primary functions from `new()` and `new_string()` to `new_sync()` and
+  `new_string_sync()`, respectively
+  - Leaving old names as aliases for backward compatibility
+
+### Added
+
+- `async-io` feature (`async_io::new()` and `async_io::new_string()`) to support
+  `async-std` and `smol`
+
+### Removed
+
+- `new_with()`, `new_string_with()`, and `unstable` feature
+
 ## v1.0.3 - 2024-08-30
 
 ### Added
