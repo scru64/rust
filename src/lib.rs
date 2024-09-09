@@ -226,14 +226,17 @@ mod shortcut {
         }
 
         let state_in_new_thread = return_value.state.clone();
-        thread::spawn(move || {
-            thread::sleep(duration);
-            let mut state = state_in_new_thread.lock().unwrap();
-            state.0 = task::Poll::Ready(());
-            if let Some(waker) = state.1.take() {
-                waker.wake();
-            }
-        });
+        thread::Builder::new()
+            .name("scru64-sleep".into())
+            .spawn(move || {
+                thread::sleep(duration);
+                let mut state = state_in_new_thread.lock().unwrap();
+                state.0 = task::Poll::Ready(());
+                if let Some(waker) = state.1.take() {
+                    waker.wake();
+                }
+            })
+            .expect("could not spawn scru64-sleep thread");
 
         return_value
     }

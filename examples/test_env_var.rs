@@ -1,7 +1,7 @@
 use scru64::generator::GlobalGenerator;
 
 /// Tests the initialization of `GlobalGenerator` by reading the environment variable and the
-/// primary `new_sync()` and `new_string_sync()` functions.
+/// `new_sync()` and `new_string_sync()` entry point functions.
 fn main() {
     // SAFETY: ok because this example is a single-threaded program.
     unsafe { std::env::set_var("SCRU64_NODE_SPEC", "42/8") };
