@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.0 - unreleased
+
+### Removed
+
+- `new()` and `new_string()` deprecated aliases
+
 ## v1.1.0 - unreleased
 
 ### Changed

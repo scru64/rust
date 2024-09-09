@@ -65,23 +65,7 @@ pub use id::Scru64Id;
 
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-pub use shortcut::{new_string_sync, new_sync};
-
-/// A synonym for [`new_sync`].
-#[cfg(feature = "global_gen")]
-#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-#[deprecated(since = "1.1.0", note = "use `new_sync()` instead")]
-pub fn new() -> Scru64Id {
-    new_sync()
-}
-
-/// A synonym for [`new_string_sync`].
-#[cfg(feature = "global_gen")]
-#[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-#[deprecated(since = "1.1.0", note = "use `new_string_sync()`")]
-pub fn new_string() -> String {
-    new_string_sync()
-}
+pub use shortcut::{new, new_string, new_string_sync, new_sync};
 
 #[cfg(test)]
 mod test_cases;
@@ -96,6 +80,53 @@ mod shortcut {
     use crate::{generator::GlobalGenerator, Scru64Id};
 
     const DELAY: time::Duration = time::Duration::from_millis(64);
+
+    /// Generates a new SCRU64 ID object using the global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    pub async fn new() -> Scru64Id {
+        loop {
+            if let Some(value) = GlobalGenerator.generate() {
+                break value;
+            } else {
+                async {}.await; // TODO sleep_fn(DELAY).await;
+            }
+        }
+    }
+
+    /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
+    /// global generator.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
+    ///
+    /// This function usually returns a value immediately, but if not possible, it sleeps and waits
+    /// for the next timestamp tick.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the global generator is not properly configured.
+    pub async fn new_string() -> String {
+        new().await.into()
+    }
+
+    /// Generates 100k monotonically increasing IDs.
+    #[cfg(test)]
+    #[tokio::test]
+    async fn test_async() {
+        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
+
+        let mut prev = new_string().await;
+        for _ in 0..100_000 {
+            let curr = new_string().await;
+            assert!(prev < curr);
+            prev = curr;
+        }
+    }
 
     /// Generates a new SCRU64 ID object using the global generator.
     #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
@@ -141,7 +172,7 @@ mod shortcut {
     /// Generates 100k monotonically increasing IDs.
     #[cfg(test)]
     #[test]
-    fn test() {
+    fn test_sync() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
         let mut prev = new_string_sync();
