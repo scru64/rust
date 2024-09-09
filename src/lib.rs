@@ -67,18 +67,18 @@ pub use id::Scru64Id;
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
 pub use shortcut::{new_string_sync, new_sync};
 
-/// A synonym for [`new_sync`].
+/// A deprecated synonym for [`new_sync`].
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-#[deprecated(since = "1.1.0", note = "use `new_sync()` instead")]
+#[deprecated(since = "1.1.0", note = "use `new_sync()` (synonym) instead")]
 pub fn new() -> Scru64Id {
     new_sync()
 }
 
-/// A synonym for [`new_string_sync`].
+/// A deprecated synonym for [`new_string_sync`].
 #[cfg(feature = "global_gen")]
 #[cfg_attr(docsrs, doc(cfg(feature = "global_gen")))]
-#[deprecated(since = "1.1.0", note = "use `new_string_sync()`")]
+#[deprecated(since = "1.1.0", note = "use `new_string_sync()` (synonym) instead")]
 pub fn new_string() -> String {
     new_string_sync()
 }
@@ -138,13 +138,20 @@ mod shortcut {
         new_sync().into()
     }
 
-    /// Generates 100k monotonically increasing IDs.
+    /// Generates 200k monotonically increasing IDs.
     #[cfg(test)]
     #[test]
-    fn test() {
+    fn test_sync() {
         let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
 
-        let mut prev = new_string_sync();
+        let mut prev = new_sync();
+        for _ in 0..100_000 {
+            let curr = new_sync();
+            assert!(prev < curr);
+            prev = curr;
+        }
+
+        let mut prev = String::from(prev);
         for _ in 0..100_000 {
             let curr = new_string_sync();
             assert!(prev < curr);
