@@ -39,9 +39,9 @@
 //! - `std` integrates the library with, among others, the system clock to draw
 //!   current timestamps. Without `std`, this crate provides limited functionality
 //!   available under `no_std` environments.
-//! - `global_gen` (implies `std`) enables the primary [`new_sync()`] and
-//!   [`new_string_sync()`] functions and the process-wide global generator under the
-//!   hood.
+//! - `global_gen` (implies `std`) enables the [`new()`], [`new_string()`], [`new_sync()`],
+//!   and [`new_string_sync()`] primary entry point functions as well as the
+//!   process-wide global generator under the hood.
 //!
 //! Optional features:
 //!
@@ -70,7 +70,7 @@ const NODE_CTR_SIZE: u8 = 24;
 
 #[cfg(feature = "global_gen")]
 mod shortcut {
-    use std::{thread, time};
+    use std::{future::Future, thread, time};
 
     use crate::{generator::GlobalGenerator, Scru64Id};
 
@@ -90,7 +90,7 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
-                async {}.await; // TODO sleep_fn(DELAY).await;
+                sleep_in_new_thread(DELAY).await;
             }
         }
     }
@@ -170,5 +170,51 @@ mod shortcut {
             assert!(prev < curr);
             prev = curr;
         }
+    }
+
+    /// Suspends execution asynchronously for at least the specified amount of time.
+    ///
+    /// Each call to this function spawns a new thread that calls [`std::thread::sleep`] and wakes
+    /// the current task after that. This function is small and works with any async executors,
+    /// while being suboptimal from the performance perspective compared to alternatives like
+    /// `tokio::time::sleep`.
+    #[cold]
+    fn sleep_in_new_thread(duration: time::Duration) -> impl Future<Output = ()> {
+        use std::{pin::Pin, sync, task};
+
+        struct Sleep {
+            state: sync::Arc<sync::Mutex<(task::Poll<()>, Option<task::Waker>)>>,
+        }
+
+        let return_value = Sleep {
+            state: sync::Arc::new(sync::Mutex::new((task::Poll::Pending, None))),
+        };
+
+        impl Future for Sleep {
+            type Output = ();
+
+            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+                let mut state = self.state.lock().unwrap();
+                if state.0.is_pending() {
+                    match state.1.as_mut() {
+                        Some(waker) => waker.clone_from(cx.waker()),
+                        None => state.1 = Some(cx.waker().clone()),
+                    }
+                }
+                state.0
+            }
+        }
+
+        let state_in_new_thread = return_value.state.clone();
+        thread::spawn(move || {
+            thread::sleep(duration);
+            let mut state = state_in_new_thread.lock().unwrap();
+            state.0 = task::Poll::Ready(());
+            if let Some(waker) = state.1.take() {
+                waker.wake();
+            }
+        });
+
+        return_value
     }
 }

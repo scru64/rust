@@ -7,6 +7,10 @@
 - `new()` and `new_string()` deprecated aliases
 - `async-io` and `tokio` features
 
+### Added
+
+- `new()` and `new_string()` as default asynchronous entry points
+
 ## v1.1.0 - unreleased
 
 ### Changed
