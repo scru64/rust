@@ -23,7 +23,7 @@
 
 - `new()` and `new_string()` as default asynchronous entry points
 
-## v1.1.0 - unreleased
+## v1.1.0 - 2024-09-09
 
 ### Changed
 
