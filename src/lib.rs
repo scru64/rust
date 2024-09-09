@@ -51,8 +51,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod generator;
-#[doc(hidden)]
-pub use generator as r#gen;
 pub mod id;
 
 pub use generator::Scru64Generator;

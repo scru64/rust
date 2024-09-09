@@ -13,10 +13,11 @@
   - `scru64::async_io::new_string()` -> `scru64::new_string()`
   - `scru64::tokio::new()` -> `scru64::new()`
   - `scru64::tokio::new_string()` -> `scru64::new_string()`
+- `scru64::gen` (alias to `scru64::generator`) is removed.
 
 ### Removed
 
-- `new()` and `new_string()` deprecated aliases
+- Deprecated aliases: `new()`, `new_string()`, and `gen`
 - `async-io` and `tokio` features
 
 ### Added
