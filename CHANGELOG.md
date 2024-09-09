@@ -5,6 +5,7 @@
 ### Removed
 
 - `new()` and `new_string()` deprecated aliases
+- `async-io` and `tokio` features
 
 ## v1.1.0 - unreleased
 

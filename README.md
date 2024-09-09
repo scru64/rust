@@ -48,11 +48,6 @@ Default features:
 Optional features:
 
 - `serde` enables serialization/deserialization via serde.
-- `async-io` (together with `global_gen`) enables the `async_io::new()` and
-  `async_io::new_string()` functions, the non-blocking counterpart of
-  `new_sync()` and `new_string_sync()`.
-- `tokio` (together with `global_gen`), like `async-io`, enables the
-  `tokio::new()` and `tokio::new_string()` functions.
 
 ## License
 
