@@ -57,7 +57,7 @@ impl DefaultCounterMode {
     fn new_rng(&self, counter_size: u8, context: &RenewContext) -> u64 {
         // use context and variable addresses as seed
         #[cfg(feature = "std")]
-        let addr = Box::into_raw(Box::new(42)) as u64;
+        let addr = (&*Box::new(42) as *const i32) as u64;
         #[cfg(not(feature = "std"))]
         let addr = (self as *const Self) as u64;
 

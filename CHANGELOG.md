@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1 - 2024-09-11
+
+### Fixed
+
+- Memory leak issue of `generator::counter_mode::DefaultCounterMode`
+
 ## v1.1.0 - 2024-09-09
 
 ### Changed
