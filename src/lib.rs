@@ -75,10 +75,10 @@ mod shortcut {
     const DELAY: time::Duration = time::Duration::from_millis(64);
 
     /// Generates a new SCRU64 ID object using the global generator.
-    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// # Panics
     ///
@@ -93,10 +93,10 @@ mod shortcut {
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
-    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// # Panics
     ///
@@ -131,11 +131,11 @@ mod shortcut {
     }
 
     /// Generates a new SCRU64 ID object using the global generator.
-    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`new`] for the
-    /// non-blocking equivalents.
+    /// non-blocking equivalent.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// # Panics
     ///
@@ -152,11 +152,11 @@ mod shortcut {
 
     /// Generates a new SCRU64 ID encoded in the 12-digit canonical string representation using the
     /// global generator.
-    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
     /// for the next timestamp tick. It employs blocking sleep to wait; see [`new_string`] for the
-    /// non-blocking equivalents.
+    /// non-blocking equivalent.
+    #[doc = concat!("\n\n", include_str!("generator/doc_global_gen.md"), "\n\n")]
     ///
     /// # Panics
     ///
