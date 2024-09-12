@@ -68,7 +68,7 @@ const NODE_CTR_SIZE: u8 = 24;
 
 #[cfg(feature = "global_gen")]
 mod shortcut {
-    use std::{future::Future, thread, time};
+    use std::{thread, time};
 
     use crate::{generator::GlobalGenerator, Scru64Id};
 
@@ -87,7 +87,7 @@ mod shortcut {
         if let Some(value) = GlobalGenerator.generate() {
             value
         } else {
-            spawn_thread(new_sync).await
+            thread_async::run(new_sync).await
         }
     }
 
@@ -105,7 +105,7 @@ mod shortcut {
         if let Some(value) = GlobalGenerator.generate() {
             value.into()
         } else {
-            spawn_thread(new_string_sync).await
+            thread_async::run(new_string_sync).await
         }
     }
 
@@ -184,75 +184,5 @@ mod shortcut {
             assert!(prev < curr);
             prev = curr;
         }
-    }
-
-    /// Executes a blocking function in a new thread, returning a [`Future`] to await the result.
-    ///
-    /// Each call to this function spawns a new thread that calls the blocking function and wakes
-    /// the current task after execution. This function is small and works with any async executors,
-    /// while being suboptimal from the performance perspective.
-    #[cold]
-    fn spawn_thread<F, T>(blocking_fn: F) -> impl Future<Output = T>
-    where
-        F: FnOnce() -> T + Send + 'static,
-        T: Send + 'static,
-    {
-        use std::{future, sync, task};
-
-        let state: (Option<T>, Option<task::Waker>) = (None, None);
-        let state_in_thread = sync::Arc::new(sync::Mutex::new(state));
-        let state_in_future = state_in_thread.clone();
-
-        thread::Builder::new()
-            .name("scru64-sleep".into())
-            .spawn(move || {
-                let output = blocking_fn();
-                let mut state = state_in_thread.lock().unwrap();
-                state.0 = Some(output);
-                if let Some(waker) = state.1.take() {
-                    waker.wake();
-                }
-            })
-            .expect("could not spawn scru64-sleep thread");
-
-        future::poll_fn(move |cx| {
-            let mut state = state_in_future.lock().unwrap();
-            match state.0.take() {
-                Some(output) => task::Poll::Ready(output),
-                None => {
-                    match state.1.as_mut() {
-                        Some(waker) => waker.clone_from(cx.waker()),
-                        None => state.1 = Some(cx.waker().clone()),
-                    }
-                    task::Poll::Pending
-                }
-            }
-        })
-    }
-
-    /// Tests if the function is executed asynchronously.
-    #[cfg(test)]
-    #[tokio::test]
-    async fn test_spawn_thread() {
-        let blocking_fn = || {
-            thread::sleep(DELAY);
-            42
-        };
-
-        let start = time::Instant::now();
-        let output = spawn_thread(blocking_fn).await;
-        let elapsed = time::Instant::now().duration_since(start);
-        assert!(DELAY <= elapsed && elapsed < DELAY * 2);
-        assert_eq!(output, 42);
-
-        let start = time::Instant::now();
-        tokio::join!(
-            spawn_thread(blocking_fn),
-            spawn_thread(blocking_fn),
-            spawn_thread(blocking_fn),
-            spawn_thread(blocking_fn),
-        );
-        let elapsed = time::Instant::now().duration_since(start);
-        assert!(DELAY <= elapsed && elapsed < DELAY * 2);
     }
 }

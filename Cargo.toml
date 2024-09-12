@@ -10,12 +10,13 @@ repository = "https://github.com/scru64/rust"
 [features]
 default = ["global_gen"]
 std = ["fstr/std"]
-global_gen = ["std"]
+global_gen = ["std", "dep:thread-async"]
 serde = ["dep:serde"]
 
 [dependencies]
 fstr = { version = "0.2", default-features = false }
 serde = { version = "1.0", default-features = false, optional = true }
+thread-async = { version = "0.1", optional = true }
 
 [dev-dependencies]
 serde_test = { version = "1.0", default-features = false }
