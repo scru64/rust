@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.0.0 - 2024-09-14
+
+### Migration from v1
+
+- The synchronous entry points `scru64::new()` and `scru64::new_string()` are
+  renamed to `scru64::new_sync()` and `scru64::new_string_sync()`, respectively.
+- The `async-io` and `tokio` features are replaced by the newly implemented
+  asynchronous entry points, `scru64::new()` and `scru64::new_string()`. Replace
+  the old functions as follows:
+  - `scru64::async_io::new()` -> `scru64::new()`
+  - `scru64::async_io::new_string()` -> `scru64::new_string()`
+  - `scru64::tokio::new()` -> `scru64::new()`
+  - `scru64::tokio::new_string()` -> `scru64::new_string()`
+- `scru64::gen` (alias to `scru64::generator`) is removed.
+
+### Removed
+
+- Deprecated aliases: `new()`, `new_string()`, and `gen`
+- `async-io` and `tokio` features
+
+### Added
+
+- `new()` and `new_string()` as default asynchronous entry points
+
 ## v1.1.1 - 2024-09-11
 
 ### Fixed

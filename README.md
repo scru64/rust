@@ -41,18 +41,13 @@ Default features:
 - `std` integrates the library with, among others, the system clock to draw
   current timestamps. Without `std`, this crate provides limited functionality
   available under `no_std` environments.
-- `global_gen` (implies `std`) enables the primary `new_sync()` and
-  `new_string_sync()` functions and the process-wide global generator under the
-  hood.
+- `global_gen` (implies `std`) enables the `new()`, `new_string()`, `new_sync()`,
+  and `new_string_sync()` primary entry point functions as well as the
+  process-wide global generator under the hood.
 
 Optional features:
 
 - `serde` enables serialization/deserialization via serde.
-- `async-io` (together with `global_gen`) enables the `async_io::new()` and
-  `async_io::new_string()` functions, the non-blocking counterpart of
-  `new_sync()` and `new_string_sync()`.
-- `tokio` (together with `global_gen`), like `async-io`, enables the
-  `tokio::new()` and `tokio::new_string()` functions.
 
 ## License
 
