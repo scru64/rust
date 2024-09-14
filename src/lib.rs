@@ -87,7 +87,7 @@ mod shortcut {
         if let Some(value) = GlobalGenerator.generate() {
             value
         } else {
-            thread_async::run(new_sync).await
+            spawn_thread_or_block(new_sync).await
         }
     }
 
@@ -105,7 +105,17 @@ mod shortcut {
         if let Some(value) = GlobalGenerator.generate() {
             value.into()
         } else {
-            thread_async::run(new_string_sync).await
+            spawn_thread_or_block(new_string_sync).await
+        }
+    }
+
+    /// Executes a task asynchronously in a separate thread, or falls back on a blocking operation
+    /// upon failure in creating a new thread.
+    #[cold]
+    async fn spawn_thread_or_block<T: Send + 'static>(f: fn() -> T) -> T {
+        match thread_async::run_with_builder(thread::Builder::new(), f) {
+            Ok((ftr, _)) => ftr.await,
+            Err(_) => f(),
         }
     }
 
