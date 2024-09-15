@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.0.1 - 2024-09-15
 
 - Refactored `new` and `new_string` to prevent occasional panics on platforms
   that do not support threading.
