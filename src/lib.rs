@@ -134,6 +134,9 @@ mod shortcut {
             if let Some(value) = GlobalGenerator.generate() {
                 break value;
             } else {
+                #[cfg(test)]
+                tests::SLEEP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
                 thread::sleep(DELAY);
             }
         }
@@ -157,6 +160,7 @@ mod shortcut {
     #[cfg(test)]
     mod tests {
         use super::{new, new_string, new_string_sync, new_sync, GlobalGenerator};
+        use std::sync::atomic;
 
         // (ticks per rollback_allowance) * (average expected capacity of 16-bit counter per tick)
         // / (aggregate number of for-loops in tests) ~= 320k
@@ -164,6 +168,13 @@ mod shortcut {
 
         fn setup() {
             let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
+        }
+
+        pub static SLEEP_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+
+        fn teardown(name: &str) {
+            let c = SLEEP_COUNT.load(atomic::Ordering::SeqCst);
+            println!("finishing {}: global sleep count is now at {}", name, c);
         }
 
         /// Generates a ton of monotonically increasing IDs.
@@ -184,6 +195,8 @@ mod shortcut {
                 assert!(prev < curr);
                 prev = curr;
             }
+
+            teardown("new_many");
         }
 
         /// Generates a ton of monotonically increasing IDs.
@@ -204,6 +217,8 @@ mod shortcut {
                 assert!(prev < curr);
                 prev = curr;
             }
+
+            teardown("new_sync_many");
         }
     }
 }
