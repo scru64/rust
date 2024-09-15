@@ -158,7 +158,9 @@ mod shortcut {
     mod tests {
         use super::{new, new_string, new_string_sync, new_sync, GlobalGenerator};
 
-        const N: usize = 100_000;
+        // (ticks per rollback_allowance) * (average expected capacity of 16-bit counter per tick)
+        // / (aggregate number of for-loops in tests) ~= 320k
+        const N: usize = (10_000 >> 8) * (1 << 15) / (4);
 
         fn setup() {
             let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
