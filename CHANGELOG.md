@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Refactored `new` and `new_string` to prevent occasional panics on platforms
+  that do not support threading.
+- Improved entry point test cases to test and trace sleeping behavior.
+
 ## v2.0.0 - 2024-09-14
 
 ### Migration from v1
