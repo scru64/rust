@@ -119,27 +119,6 @@ mod shortcut {
         }
     }
 
-    /// Generates 200k monotonically increasing IDs.
-    #[cfg(test)]
-    #[tokio::test]
-    async fn test_async() {
-        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
-
-        let mut prev = new().await;
-        for _ in 0..100_000 {
-            let curr = new().await;
-            assert!(prev < curr);
-            prev = curr;
-        }
-
-        let mut prev = String::from(prev);
-        for _ in 0..100_000 {
-            let curr = new_string().await;
-            assert!(prev < curr);
-            prev = curr;
-        }
-    }
-
     /// Generates a new SCRU64 ID object using the global generator.
     ///
     /// This function usually returns a value immediately, but if not possible, it sleeps and waits
@@ -175,24 +154,54 @@ mod shortcut {
         new_sync().into()
     }
 
-    /// Generates 200k monotonically increasing IDs.
     #[cfg(test)]
-    #[test]
-    fn test_sync() {
-        let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
+    mod tests {
+        use super::{new, new_string, new_string_sync, new_sync, GlobalGenerator};
 
-        let mut prev = new_sync();
-        for _ in 0..100_000 {
-            let curr = new_sync();
-            assert!(prev < curr);
-            prev = curr;
+        const N: usize = 100_000;
+
+        fn setup() {
+            let _ = GlobalGenerator.initialize("42/8".parse().unwrap());
         }
 
-        let mut prev = String::from(prev);
-        for _ in 0..100_000 {
-            let curr = new_string_sync();
-            assert!(prev < curr);
-            prev = curr;
+        /// Generates a ton of monotonically increasing IDs.
+        #[tokio::test]
+        async fn new_many() {
+            setup();
+
+            let mut prev = new().await;
+            for _ in 0..N {
+                let curr = new().await;
+                assert!(prev < curr);
+                prev = curr;
+            }
+
+            let mut prev = String::from(prev);
+            for _ in 0..N {
+                let curr = new_string().await;
+                assert!(prev < curr);
+                prev = curr;
+            }
+        }
+
+        /// Generates a ton of monotonically increasing IDs.
+        #[test]
+        fn new_sync_many() {
+            setup();
+
+            let mut prev = new_sync();
+            for _ in 0..N {
+                let curr = new_sync();
+                assert!(prev < curr);
+                prev = curr;
+            }
+
+            let mut prev = String::from(prev);
+            for _ in 0..N {
+                let curr = new_string_sync();
+                assert!(prev < curr);
+                prev = curr;
+            }
         }
     }
 }
